@@ -2,4 +2,15 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="background">#FFF5F5F5</color>
+    <color name="text_primary">#FF1B1B1B</color>
+    <color name="text_secondary">#FF757575</color>
+    <color name="verdict_green">#FF2E7D32</color>
+    <color name="verdict_green_bg">#FFE8F5E9</color>
+    <color name="verdict_yellow">#FFF57F17</color>
+    <color name="verdict_yellow_bg">#FFFFF8E1</color>
+    <color name="verdict_red">#FFC62828</color>
+    <color name="verdict_red_bg">#FFFFEBEE</color>
+    <color name="finding_detected">#FFE53935</color>
+    <color name="finding_ok">#FF43A047</color>
 </resources>
