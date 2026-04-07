@@ -4,7 +4,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
+    android:background="?android:attr/colorBackground"
     tools:context=".MainActivity">
 
     <LinearLayout
@@ -19,7 +19,7 @@
             android:layout_marginBottom="4dp"
             android:gravity="center"
             android:text="RKN Hardering"
-            android:textColor="@color/text_primary"
+            android:textColor="?android:attr/textColorPrimary"
             android:textSize="24sp"
             android:textStyle="bold" />
 
@@ -29,7 +29,7 @@
             android:layout_marginBottom="16dp"
             android:gravity="center"
             android:text="Самопроверка на обнаружение VPN/Proxy"
-            android:textColor="@color/text_secondary"
+            android:textColor="?android:attr/textColorSecondary"
             android:textSize="14sp" />
 
         <com.google.android.material.button.MaterialButton
@@ -81,7 +81,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="GeoIP"
-                        android:textColor="@color/text_primary"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -133,7 +133,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="Прямые признаки"
-                        android:textColor="@color/text_primary"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -185,7 +185,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="Косвенные признаки"
-                        android:textColor="@color/text_primary"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 

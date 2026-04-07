@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering
 
 import android.graphics.Typeface
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
@@ -161,7 +162,9 @@ class MainActivity : AppCompatActivity() {
         val description = TextView(this).apply {
             text = finding.description
             textSize = 13f
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            val tv = TypedValue()
+            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
+            setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
