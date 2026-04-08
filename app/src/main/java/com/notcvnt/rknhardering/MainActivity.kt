@@ -305,15 +305,38 @@ class MainActivity : AppCompatActivity() {
         if (category.detected) {
             icon.setImageResource(R.drawable.ic_warning)
             status.text = "Обнаружено"
-            status.setTextColor(ContextCompat.getColor(this, R.color.finding_detected))
+            status.setTextColor(ContextCompat.getColor(this, R.color.status_red))
         } else if (category.needsReview) {
             icon.setImageResource(R.drawable.ic_help)
             status.text = "Требует проверки"
-            status.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+            status.setTextColor(ContextCompat.getColor(this, R.color.status_amber))
         } else {
             icon.setImageResource(R.drawable.ic_check_circle)
             status.text = "Чисто"
-            status.setTextColor(ContextCompat.getColor(this, R.color.finding_ok))
+            status.setTextColor(ContextCompat.getColor(this, R.color.status_green))
+        }
+
+        // GeoIP card: info fields (source==null) go to the key-value section,
+        // actual checks (source!=null) go to the findings list
+        if (card.id == R.id.cardGeoIp) {
+            val infoFindings = category.findings.filter { it.source == null }
+            val checkFindings = category.findings.filter { it.source != null }
+
+            geoIpInfoSection.removeAllViews()
+            for (finding in infoFindings) {
+                val parts = finding.description.split(": ", limit = 2)
+                if (parts.size == 2) {
+                    geoIpInfoSection.addView(createGeoInfoView(parts[0], parts[1]))
+                }
+            }
+            val hasInfo = infoFindings.isNotEmpty() && checkFindings.isNotEmpty()
+            geoIpDivider.visibility = if (hasInfo) View.VISIBLE else View.GONE
+
+            findingsContainer.removeAllViews()
+            for (finding in checkFindings) {
+                findingsContainer.addView(createFindingView(finding))
+            }
+            return
         }
 
         findingsContainer.removeAllViews()
@@ -407,11 +430,11 @@ class MainActivity : AppCompatActivity() {
         if (bypass.detected) {
             iconBypass.setImageResource(R.drawable.ic_warning)
             statusBypass.text = "Обнаружено"
-            statusBypass.setTextColor(ContextCompat.getColor(this, R.color.finding_detected))
+            statusBypass.setTextColor(ContextCompat.getColor(this, R.color.status_red))
         } else if (bypass.needsReview) {
             iconBypass.setImageResource(R.drawable.ic_help)
             statusBypass.text = "Требует проверки"
-            statusBypass.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+            statusBypass.setTextColor(ContextCompat.getColor(this, R.color.status_amber))
         } else {
             iconBypass.setImageResource(R.drawable.ic_check_circle)
             statusBypass.text = "Чисто"
