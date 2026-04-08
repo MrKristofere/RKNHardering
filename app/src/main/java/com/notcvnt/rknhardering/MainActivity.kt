@@ -43,8 +43,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRunCheck: MaterialButton
     private lateinit var btnStopCheck: MaterialButton
     private lateinit var btnReRequestPermissions: MaterialButton
+    private lateinit var cardRunCheckNotice: MaterialCardView
     private lateinit var linkGithub: TextView
     private var checkJob: Job? = null
+    private var hasDismissedRunCheckNotice = false
     private lateinit var progressBar: ProgressBar
     private lateinit var cardGeoIp: MaterialCardView
     private lateinit var cardIpComparison: MaterialCardView
@@ -98,6 +100,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         bindViews()
+        hasDismissedRunCheckNotice = savedInstanceState?.getBoolean(STATE_RUN_CHECK_NOTICE_HIDDEN, false) ?: false
+        updateRunCheckNoticeVisibility()
 
         linkGithub.setOnClickListener { openGithubRepo() }
         btnRunCheck.setOnClickListener { onRunCheckClicked() }
@@ -113,6 +117,7 @@ class MainActivity : AppCompatActivity() {
         btnRunCheck = findViewById(R.id.btnRunCheck)
         btnStopCheck = findViewById(R.id.btnStopCheck)
         btnReRequestPermissions = findViewById(R.id.btnReRequestPermissions)
+        cardRunCheckNotice = findViewById(R.id.cardRunCheckNotice)
         linkGithub = findViewById(R.id.linkGithub)
         progressBar = findViewById(R.id.progressBar)
         cardGeoIp = findViewById(R.id.cardGeoIp)
@@ -250,7 +255,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onRunCheckClicked() {
+        hasDismissedRunCheckNotice = true
+        updateRunCheckNoticeVisibility()
         runCheck()
+    }
+
+    private fun updateRunCheckNoticeVisibility() {
+        cardRunCheckNotice.visibility = if (hasDismissedRunCheckNotice) View.GONE else View.VISIBLE
     }
 
     private fun runCheck() {
@@ -678,8 +689,14 @@ class MainActivity : AppCompatActivity() {
     private val Int.dp: Int
         get() = (this * resources.displayMetrics.density).toInt()
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_RUN_CHECK_NOTICE_HIDDEN, hasDismissedRunCheckNotice)
+    }
+
     companion object {
         private const val PREF_RATIONALE_SHOWN = "permissions_rationale_shown"
         private const val PREF_REQUESTED_PERMISSIONS = "requested_permissions"
+        private const val STATE_RUN_CHECK_NOTICE_HIDDEN = "state_run_check_notice_hidden"
     }
 }
