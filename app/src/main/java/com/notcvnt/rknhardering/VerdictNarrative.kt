@@ -61,6 +61,7 @@ object VerdictNarrativeBuilder {
             it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected
         }
         val gatewayLeakIps = gatewayLeakFinding?.description?.let(::extractIps).orEmpty()
+        val gatewayLeakIpPair = gatewayLeakIps.takeIf { it.size >= 2 }
         val vpnProbeFinding = result.bypassResult.findings.firstOrNull {
             (it.source == EvidenceSource.VPN_NETWORK_BINDING || it.source == EvidenceSource.TUN_ACTIVE_PROBE) &&
                 extractIps(it.description).isNotEmpty()
@@ -72,10 +73,10 @@ object VerdictNarrativeBuilder {
             localProxyEndpoint = result.bypassResult.proxyEndpoint?.let {
                 "${it.type.name} ${formatHostPort(it.host, it.port)}"
             },
-            vpnNetworkIp = gatewayLeakIps.getOrNull(0)
+            vpnNetworkIp = gatewayLeakIpPair?.get(0)
                 ?: result.bypassResult.vpnNetworkIp
                 ?: vpnProbeFinding?.description?.let(::extractIps)?.firstOrNull(),
-            realIp = gatewayLeakIps.getOrNull(1) ?: result.bypassResult.underlyingIp,
+            realIp = gatewayLeakIpPair?.get(1) ?: result.bypassResult.underlyingIp,
             directIp = result.bypassResult.directIp,
             proxyIp = result.bypassResult.proxyIp,
             geoIp = extractGeoIp(context, result.geoIp),
@@ -281,9 +282,8 @@ object VerdictNarrativeBuilder {
     }
 
     private fun extractIps(text: String): List<String> {
-        val ipv4 = ipv4Regex.findAll(text).map { it.value }.toList()
-        val ipv6 = ipv6Regex.findAll(text).map { it.value }.toList()
-        return (ipv4 + ipv6).distinct()
+        val combinedIpRegex = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b|(?<![A-Za-z0-9])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f]{0,4}(?![A-Za-z0-9])""")
+        return combinedIpRegex.findAll(text).map { it.value }.distinct().toList()
     }
 
     private fun maybeMask(value: String, privacyMode: Boolean): String {

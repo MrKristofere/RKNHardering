@@ -180,6 +180,46 @@ class VerdictNarrativeTest {
     }
 
     @Test
+    fun `gateway leak keeps vpn and real ip order across mixed address families`() {
+        val narrative = VerdictNarrativeBuilder.build(
+            context = context,
+            result = result(
+                verdict = Verdict.DETECTED,
+                bypass = bypass(
+                    vpnNetworkIp = "2001:db8::1",
+                    underlyingIp = "198.51.100.10",
+                    findings = listOf(
+                        Finding(
+                            description = context.getString(
+                                R.string.checker_bypass_gateway_leak,
+                                "2001:db8::1",
+                                "198.51.100.10",
+                            ),
+                            detected = true,
+                            source = EvidenceSource.VPN_GATEWAY_LEAK,
+                            confidence = EvidenceConfidence.HIGH,
+                        ),
+                    ),
+                    evidence = listOf(evidence(EvidenceSource.VPN_GATEWAY_LEAK)),
+                ),
+            ),
+        )
+
+        assertTrue(
+            narrative.discoveredRows.any {
+                it.label == context.getString(R.string.narrative_label_vpn_network_ip) &&
+                    it.value == "2001:db8::1"
+            },
+        )
+        assertTrue(
+            narrative.discoveredRows.any {
+                it.label == context.getString(R.string.narrative_label_real_ip) &&
+                    it.value == "198.51.100.10"
+            },
+        )
+    }
+
+    @Test
     fun `empty result falls back to insufficient data`() {
         val narrative = VerdictNarrativeBuilder.build(context = context, result = result())
 

@@ -393,9 +393,12 @@ object BypassChecker {
         }
 
         var detected = false
+        val unavailable = context.getString(R.string.checker_bypass_ip_unavailable)
 
         when {
-            result.vpnIp != null && result.activeNetworkIsVpn == false -> {
+            result.vpnIp != null &&
+                result.activeNetworkIsVpn == false &&
+                result.underlyingReachable -> {
                 findings.add(
                     Finding(
                         description = context.getString(
@@ -468,8 +471,31 @@ object BypassChecker {
             return false
         }
 
-        val ipsAreDifferent = result.vpnIp != null && result.underlyingIp != null &&
-            result.vpnIp != result.underlyingIp
+        if (result.vpnIp == null) {
+            findings.add(
+                Finding(
+                    description = context.getString(
+                        R.string.checker_bypass_gateway_leak,
+                        unavailable,
+                        result.underlyingIp ?: unavailable,
+                    ),
+                    detected = true,
+                    source = EvidenceSource.VPN_GATEWAY_LEAK,
+                    confidence = EvidenceConfidence.HIGH,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.VPN_GATEWAY_LEAK,
+                    detected = true,
+                    confidence = EvidenceConfidence.HIGH,
+                    description = "App can reach internet bypassing VPN tunnel via underlying network while VPN-bound IP probe is unavailable",
+                ),
+            )
+            return true
+        }
+
+        val ipsAreDifferent = result.underlyingIp != null && result.vpnIp != result.underlyingIp
 
         if (ipsAreDifferent) {
             val description = context.getString(

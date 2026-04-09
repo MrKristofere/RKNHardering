@@ -92,6 +92,35 @@ class BypassCheckerTest {
     }
 
     @Test
+    fun `vpn network binding requires verified underlying internet path`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val detected = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = false,
+                vpnIp = "185.220.1.10",
+                underlyingIp = null,
+                activeNetworkIsVpn = false,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertFalse(detected)
+        assertFalse(evidence.any { it.source == EvidenceSource.VPN_NETWORK_BINDING && it.detected })
+        assertTrue(
+            findings.any {
+                it.isInformational &&
+                    it.source == EvidenceSource.VPN_NETWORK_BINDING &&
+                    it.description.contains("185.220.1.10")
+            },
+        )
+    }
+
+    @Test
     fun `tun probe failure is recorded when vpn active but fetch returned null`() {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
@@ -114,6 +143,35 @@ class BypassCheckerTest {
                 it.isInformational &&
                     it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
                     it.description.contains("unavailable")
+            },
+        )
+    }
+
+    @Test
+    fun `gateway leak remains detected when underlying path works but vpn ip probe fails`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val detected = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                vpnIp = null,
+                underlyingIp = "91.198.174.192",
+                activeNetworkIsVpn = true,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertTrue(detected)
+        assertTrue(evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected })
+        assertTrue(
+            findings.any {
+                it.source == EvidenceSource.VPN_GATEWAY_LEAK &&
+                    it.detected &&
+                    it.description.contains("91.198.174.192")
             },
         )
     }
