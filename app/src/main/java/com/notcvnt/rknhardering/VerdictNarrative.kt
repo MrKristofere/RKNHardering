@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering
 
+import android.content.Context
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
@@ -7,12 +8,20 @@ import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.probe.XrayOutboundSummary
 
-enum class ExposureStatus(val label: String) {
-    REMOTE_ENDPOINT_DISCOVERED("Получен адрес удалённого узла"),
-    PUBLIC_IP_ONLY("Получен только внешний IP"),
-    LOCAL_PROXY_OR_API_ONLY("Найден только локальный proxy/API"),
-    TECHNICAL_SIGNAL_ONLY("Есть только технические сетевые сигналы"),
-    INSUFFICIENT_DATA("Данных о сервере не получено"),
+enum class ExposureStatus {
+    REMOTE_ENDPOINT_DISCOVERED,
+    PUBLIC_IP_ONLY,
+    LOCAL_PROXY_OR_API_ONLY,
+    TECHNICAL_SIGNAL_ONLY,
+    INSUFFICIENT_DATA;
+
+    fun label(context: Context): String = when (this) {
+        REMOTE_ENDPOINT_DISCOVERED -> context.getString(R.string.narrative_exposure_remote_endpoint)
+        PUBLIC_IP_ONLY -> context.getString(R.string.narrative_exposure_public_ip)
+        LOCAL_PROXY_OR_API_ONLY -> context.getString(R.string.narrative_exposure_local_proxy)
+        TECHNICAL_SIGNAL_ONLY -> context.getString(R.string.narrative_exposure_technical_signal)
+        INSUFFICIENT_DATA -> context.getString(R.string.narrative_exposure_insufficient)
+    }
 }
 
 data class NarrativeRow(
@@ -33,16 +42,16 @@ object VerdictNarrativeBuilder {
     private val ipv4Regex = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
     private val ipv6Regex = Regex("""(?<![A-Za-z0-9])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f]{0,4}(?![A-Za-z0-9])""")
 
-    fun build(result: CheckResult, privacyMode: Boolean = false): VerdictNarrative {
+    fun build(context: Context, result: CheckResult, privacyMode: Boolean = false): VerdictNarrative {
         val snapshot = collectSnapshot(result)
         val exposureStatus = determineExposureStatus(snapshot)
 
         return VerdictNarrative(
-            explanation = buildExplanation(result.verdict, exposureStatus),
+            explanation = buildExplanation(context, result.verdict, exposureStatus),
             exposureStatus = exposureStatus,
-            meaningRows = buildMeaningRows(result.verdict, exposureStatus),
-            discoveredRows = buildDiscoveredRows(snapshot, exposureStatus, privacyMode),
-            reasonRows = buildReasonRows(result),
+            meaningRows = buildMeaningRows(context, result.verdict, exposureStatus),
+            discoveredRows = buildDiscoveredRows(context, snapshot, exposureStatus, privacyMode),
+            reasonRows = buildReasonRows(context, result),
         )
     }
 
@@ -90,49 +99,50 @@ object VerdictNarrativeBuilder {
         }
     }
 
-    private fun buildExplanation(verdict: Verdict, exposureStatus: ExposureStatus): String {
+    private fun buildExplanation(context: Context, verdict: Verdict, exposureStatus: ExposureStatus): String {
         val base = when (verdict) {
-            Verdict.DETECTED -> "Автоматическая проверка считает обход подтверждённым."
-            Verdict.NEEDS_REVIEW -> "Автоматической проверки недостаточно для однозначного вывода."
-            Verdict.NOT_DETECTED -> "Проверка не нашла убедительных признаков обхода."
+            Verdict.DETECTED -> context.getString(R.string.narrative_explanation_detected)
+            Verdict.NEEDS_REVIEW -> context.getString(R.string.narrative_explanation_needs_review)
+            Verdict.NOT_DETECTED -> context.getString(R.string.narrative_explanation_not_detected)
         }
         val exposure = when (exposureStatus) {
             ExposureStatus.REMOTE_ENDPOINT_DISCOVERED ->
-                "Удалось получить адрес удалённого узла из локального Xray API."
+                context.getString(R.string.narrative_explanation_exposure_remote)
             ExposureStatus.PUBLIC_IP_ONLY ->
-                "Удалось увидеть только внешний IP выхода, но не адрес конечного сервера."
+                context.getString(R.string.narrative_explanation_exposure_public_ip)
             ExposureStatus.LOCAL_PROXY_OR_API_ONLY ->
-                "Удалось увидеть только локальный proxy/API на устройстве, без адреса удалённого узла."
+                context.getString(R.string.narrative_explanation_exposure_local_proxy)
             ExposureStatus.TECHNICAL_SIGNAL_ONLY ->
-                "Есть только технические сигналы сети и маршрутов, без адреса сервера."
+                context.getString(R.string.narrative_explanation_exposure_technical)
             ExposureStatus.INSUFFICIENT_DATA ->
-                "Адрес сервера или внешний IP получить не удалось."
+                context.getString(R.string.narrative_explanation_exposure_insufficient)
         }
         return "$base $exposure"
     }
 
-    private fun buildMeaningRows(verdict: Verdict, exposureStatus: ExposureStatus): List<String> {
+    private fun buildMeaningRows(context: Context, verdict: Verdict, exposureStatus: ExposureStatus): List<String> {
         val verdictMeaning = when (verdict) {
-            Verdict.DETECTED -> "Красный вердикт означает, что автоматическая проверка собрала достаточные признаки обхода."
-            Verdict.NEEDS_REVIEW -> "Жёлтый вердикт означает, что сигналы есть, но их нужно перепроверить вручную."
-            Verdict.NOT_DETECTED -> "Зелёный вердикт означает, что решающие сигналы обхода не найдены."
+            Verdict.DETECTED -> context.getString(R.string.narrative_meaning_detected)
+            Verdict.NEEDS_REVIEW -> context.getString(R.string.narrative_meaning_needs_review)
+            Verdict.NOT_DETECTED -> context.getString(R.string.narrative_meaning_not_detected)
         }
         val exposureMeaning = when (exposureStatus) {
             ExposureStatus.REMOTE_ENDPOINT_DISCOVERED ->
-                "Удалось получить именно адрес удалённого узла, а не только внешний IP."
+                context.getString(R.string.narrative_meaning_exposure_remote)
             ExposureStatus.PUBLIC_IP_ONLY ->
-                "Внешний IP и адрес конечного сервера не одно и то же: внешний IP видят интернет-сервисы, но это может быть только точка выхода."
+                context.getString(R.string.narrative_meaning_exposure_public_ip)
             ExposureStatus.LOCAL_PROXY_OR_API_ONLY ->
-                "Локальный proxy/API говорит о механизме обхода на устройстве, но сам по себе не раскрывает удалённый сервер."
+                context.getString(R.string.narrative_meaning_exposure_local_proxy)
             ExposureStatus.TECHNICAL_SIGNAL_ONLY ->
-                "Технические сигналы подтверждают сетевое поведение, но не дают адрес удалённого узла."
+                context.getString(R.string.narrative_meaning_exposure_technical)
             ExposureStatus.INSUFFICIENT_DATA ->
-                "По текущим данным нельзя сказать, удалось ли приложению узнать адрес сервера обхода."
+                context.getString(R.string.narrative_meaning_exposure_insufficient)
         }
         return listOf(verdictMeaning, exposureMeaning)
     }
 
     private fun buildDiscoveredRows(
+        context: Context,
         snapshot: Snapshot,
         exposureStatus: ExposureStatus,
         privacyMode: Boolean,
@@ -144,55 +154,56 @@ object VerdictNarrativeBuilder {
             rows += NarrativeRow(label, maybeMask(value, privacyMode))
         }
 
-        addRow("Уровень раскрытия", exposureStatus.label)
-        addRow("Локальный Xray API", snapshot.localApiEndpoint)
+        addRow(context.getString(R.string.narrative_label_exposure_level), exposureStatus.label(context))
+        addRow(context.getString(R.string.narrative_label_xray_api), snapshot.localApiEndpoint)
 
         snapshot.remoteEndpoints.take(3).forEachIndexed { index, endpoint ->
             addRow(
-                if (index == 0) "Адрес удалённого узла" else "Доп. адрес удалённого узла",
+                if (index == 0) context.getString(R.string.narrative_label_remote_endpoint)
+                else context.getString(R.string.narrative_label_remote_endpoint_extra),
                 endpoint,
             )
         }
 
-        addRow("Локальный proxy", snapshot.localProxyEndpoint)
-        addRow("IP через VPN Network", snapshot.vpnNetworkIp)
-        addRow("IP вне VPN", snapshot.realIp)
-        addRow("Публичный IP напрямую", snapshot.directIp)
-        addRow("Публичный IP через proxy", snapshot.proxyIp)
+        addRow(context.getString(R.string.narrative_label_local_proxy), snapshot.localProxyEndpoint)
+        addRow(context.getString(R.string.narrative_label_vpn_network_ip), snapshot.vpnNetworkIp)
+        addRow(context.getString(R.string.narrative_label_real_ip), snapshot.realIp)
+        addRow(context.getString(R.string.narrative_label_direct_ip), snapshot.directIp)
+        addRow(context.getString(R.string.narrative_label_proxy_ip), snapshot.proxyIp)
 
         if (!snapshot.ruCheckerIp.isNullOrBlank() && snapshot.ruCheckerIp == snapshot.nonRuCheckerIp) {
-            addRow("IP по внешним чекерам", snapshot.ruCheckerIp)
+            addRow(context.getString(R.string.narrative_label_checkers_ip), snapshot.ruCheckerIp)
         } else {
-            addRow("IP RU-чекеров", snapshot.ruCheckerIp)
-            addRow("IP не-RU чекеров", snapshot.nonRuCheckerIp)
+            addRow(context.getString(R.string.narrative_label_ru_checkers_ip), snapshot.ruCheckerIp)
+            addRow(context.getString(R.string.narrative_label_non_ru_checkers_ip), snapshot.nonRuCheckerIp)
         }
 
-        addRow("IP из GeoIP", snapshot.geoIp)
+        addRow(context.getString(R.string.narrative_label_geo_ip), snapshot.geoIp)
         return rows
     }
 
-    private fun buildReasonRows(result: CheckResult): List<String> {
+    private fun buildReasonRows(context: Context, result: CheckResult): List<String> {
         val reasons = linkedSetOf<String>()
 
         if (hasBypassEvidence(result.bypassResult, EvidenceSource.XRAY_API)) {
-            reasons += "На устройстве найден локальный Xray API, из которого читаются outbound-адреса."
+            reasons += context.getString(R.string.narrative_reason_xray_api)
         }
         if (hasBypassEvidence(result.bypassResult, EvidenceSource.SPLIT_TUNNEL_BYPASS)) {
-            reasons += "Прямой IP и IP через локальный proxy различаются."
+            reasons += context.getString(R.string.narrative_reason_split_tunnel)
         }
         if (hasBypassEvidence(result.bypassResult, EvidenceSource.VPN_GATEWAY_LEAK)) {
-            reasons += "При активном VPN приложение смогло выйти через non-VPN сеть."
+            reasons += context.getString(R.string.narrative_reason_vpn_gateway_leak)
         }
         if (hasBypassEvidence(result.bypassResult, EvidenceSource.VPN_NETWORK_BINDING)) {
-            reasons += "Приложение смогло использовать объект VPN Network отдельно от обычной сети."
+            reasons += context.getString(R.string.narrative_reason_vpn_network_binding)
         }
         if (result.bypassResult.needsReview) {
-            reasons += "Найден локальный proxy, но обход не подтвердился автоматически."
+            reasons += context.getString(R.string.narrative_reason_bypass_unconfirmed)
         }
         if (result.ipComparison.detected) {
-            reasons += "RU и не-RU IP-чекеры вернули разные внешние IP."
+            reasons += context.getString(R.string.narrative_reason_ip_comparison_detected)
         } else if (result.ipComparison.needsReview) {
-            reasons += "Внешние IP-чекеры ответили неполно или противоречиво."
+            reasons += context.getString(R.string.narrative_reason_ip_comparison_review)
         }
 
         val foreignGeoSignal = result.geoIp.needsReview || result.geoIp.evidence.any {
@@ -204,23 +215,23 @@ object VerdictNarrativeBuilder {
                 it.description.contains("location_country_ru:true")
         }
         if (foreignGeoSignal && locationConfirmsRussia) {
-            reasons += "Сигналы местоположения указывают на Россию, а GeoIP — на внешний адрес."
+            reasons += context.getString(R.string.narrative_reason_geo_location_conflict)
         } else if (foreignGeoSignal) {
-            reasons += "GeoIP даёт внешний или подозрительный адрес."
+            reasons += context.getString(R.string.narrative_reason_geo_foreign)
         }
 
         if (result.directSigns.detected) {
-            reasons += "Найдены прямые признаки локального proxy/VPN."
+            reasons += context.getString(R.string.narrative_reason_direct_signs)
         }
         if (result.indirectSigns.detected) {
-            reasons += "Найдены косвенные признаки туннеля, маршрутов или DNS-подмены."
+            reasons += context.getString(R.string.narrative_reason_indirect_signs)
         }
 
         if (reasons.isEmpty()) {
             reasons += when (result.verdict) {
-                Verdict.DETECTED -> "Вердикт собран из сочетания нескольких сигналов проверки."
-                Verdict.NEEDS_REVIEW -> "Сигналы частичные или противоречивые, поэтому нужен ручной разбор."
-                Verdict.NOT_DETECTED -> "Решающие сигналы обхода не найдены."
+                Verdict.DETECTED -> context.getString(R.string.narrative_reason_fallback_detected)
+                Verdict.NEEDS_REVIEW -> context.getString(R.string.narrative_reason_fallback_review)
+                Verdict.NOT_DETECTED -> context.getString(R.string.narrative_reason_fallback_clean)
             }
         }
 

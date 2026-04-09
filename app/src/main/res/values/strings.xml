@@ -112,4 +112,64 @@
         <item quantity="many">портов</item>
         <item quantity="other">портов</item>
     </plurals>
+
+    <!-- VerdictNarrative: ExposureStatus labels -->
+    <string name="narrative_exposure_remote_endpoint">Получен адрес удалённого узла</string>
+    <string name="narrative_exposure_public_ip">Получен только внешний IP</string>
+    <string name="narrative_exposure_local_proxy">Найден только локальный proxy/API</string>
+    <string name="narrative_exposure_technical_signal">Есть только технические сетевые сигналы</string>
+    <string name="narrative_exposure_insufficient">Данных о сервере не получено</string>
+
+    <!-- VerdictNarrative: explanation base -->
+    <string name="narrative_explanation_detected">Автоматическая проверка считает обход подтверждённым.</string>
+    <string name="narrative_explanation_needs_review">Автоматической проверки недостаточно для однозначного вывода.</string>
+    <string name="narrative_explanation_not_detected">Проверка не нашла убедительных признаков обхода.</string>
+
+    <!-- VerdictNarrative: explanation exposure -->
+    <string name="narrative_explanation_exposure_remote">Удалось получить адрес удалённого узла из локального Xray API.</string>
+    <string name="narrative_explanation_exposure_public_ip">Удалось увидеть только внешний IP выхода, но не адрес конечного сервера.</string>
+    <string name="narrative_explanation_exposure_local_proxy">Удалось увидеть только локальный proxy/API на устройстве, без адреса удалённого узла.</string>
+    <string name="narrative_explanation_exposure_technical">Есть только технические сигналы сети и маршрутов, без адреса сервера.</string>
+    <string name="narrative_explanation_exposure_insufficient">Адрес сервера или внешний IP получить не удалось.</string>
+
+    <!-- VerdictNarrative: meaning rows -->
+    <string name="narrative_meaning_detected">Красный вердикт означает, что автоматическая проверка собрала достаточные признаки обхода.</string>
+    <string name="narrative_meaning_needs_review">Жёлтый вердикт означает, что сигналы есть, но их нужно перепроверить вручную.</string>
+    <string name="narrative_meaning_not_detected">Зелёный вердикт означает, что решающие сигналы обхода не найдены.</string>
+    <string name="narrative_meaning_exposure_remote">Удалось получить именно адрес удалённого узла, а не только внешний IP.</string>
+    <string name="narrative_meaning_exposure_public_ip">Внешний IP и адрес конечного сервера не одно и то же: внешний IP видят интернет-сервисы, но это может быть только точка выхода.</string>
+    <string name="narrative_meaning_exposure_local_proxy">Локальный proxy/API говорит о механизме обхода на устройстве, но сам по себе не раскрывает удалённый сервер.</string>
+    <string name="narrative_meaning_exposure_technical">Технические сигналы подтверждают сетевое поведение, но не дают адрес удалённого узла.</string>
+    <string name="narrative_meaning_exposure_insufficient">По текущим данным нельзя сказать, удалось ли приложению узнать адрес сервера обхода.</string>
+
+    <!-- VerdictNarrative: discovered row labels -->
+    <string name="narrative_label_exposure_level">Уровень раскрытия</string>
+    <string name="narrative_label_xray_api">Локальный Xray API</string>
+    <string name="narrative_label_remote_endpoint">Адрес удалённого узла</string>
+    <string name="narrative_label_remote_endpoint_extra">Доп. адрес удалённого узла</string>
+    <string name="narrative_label_local_proxy">Локальный proxy</string>
+    <string name="narrative_label_vpn_network_ip">IP через VPN Network</string>
+    <string name="narrative_label_real_ip">IP вне VPN</string>
+    <string name="narrative_label_direct_ip">Публичный IP напрямую</string>
+    <string name="narrative_label_proxy_ip">Публичный IP через proxy</string>
+    <string name="narrative_label_checkers_ip">IP по внешним чекерам</string>
+    <string name="narrative_label_ru_checkers_ip">IP RU-чекеров</string>
+    <string name="narrative_label_non_ru_checkers_ip">IP не-RU чекеров</string>
+    <string name="narrative_label_geo_ip">IP из GeoIP</string>
+
+    <!-- VerdictNarrative: reason rows -->
+    <string name="narrative_reason_xray_api">На устройстве найден локальный Xray API, из которого читаются outbound-адреса.</string>
+    <string name="narrative_reason_split_tunnel">Прямой IP и IP через локальный proxy различаются.</string>
+    <string name="narrative_reason_vpn_gateway_leak">При активном VPN приложение смогло выйти через non-VPN сеть.</string>
+    <string name="narrative_reason_vpn_network_binding">Приложение смогло использовать объект VPN Network отдельно от обычной сети.</string>
+    <string name="narrative_reason_bypass_unconfirmed">Найден локальный proxy, но обход не подтвердился автоматически.</string>
+    <string name="narrative_reason_ip_comparison_detected">RU и не-RU IP-чекеры вернули разные внешние IP.</string>
+    <string name="narrative_reason_ip_comparison_review">Внешние IP-чекеры ответили неполно или противоречиво.</string>
+    <string name="narrative_reason_geo_location_conflict">Сигналы местоположения указывают на Россию, а GeoIP — на внешний адрес.</string>
+    <string name="narrative_reason_geo_foreign">GeoIP даёт внешний или подозрительный адрес.</string>
+    <string name="narrative_reason_direct_signs">Найдены прямые признаки локального proxy/VPN.</string>
+    <string name="narrative_reason_indirect_signs">Найдены косвенные признаки туннеля, маршрутов или DNS-подмены.</string>
+    <string name="narrative_reason_fallback_detected">Вердикт собран из сочетания нескольких сигналов проверки.</string>
+    <string name="narrative_reason_fallback_review">Сигналы частичные или противоречивые, поэтому нужен ручной разбор.</string>
+    <string name="narrative_reason_fallback_clean">Решающие сигналы обхода не найдены.</string>
 </resources>

@@ -1,5 +1,7 @@
 package com.notcvnt.rknhardering
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
@@ -21,12 +23,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class VerdictNarrativeTest {
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
     fun `split tunnel confirmation is described as public ip only`() {
         val narrative = VerdictNarrativeBuilder.build(
+            context = context,
             result = result(
                 verdict = Verdict.DETECTED,
                 bypass = bypass(
@@ -46,6 +54,7 @@ class VerdictNarrativeTest {
     @Test
     fun `xray api endpoint is described as remote endpoint disclosure`() {
         val narrative = VerdictNarrativeBuilder.build(
+            context = context,
             result = result(
                 verdict = Verdict.DETECTED,
                 bypass = bypass(
@@ -82,6 +91,7 @@ class VerdictNarrativeTest {
     @Test
     fun `tun probe only is described as technical signal`() {
         val narrative = VerdictNarrativeBuilder.build(
+            context = context,
             result = result(
                 verdict = Verdict.NOT_DETECTED,
                 bypass = bypass(
@@ -103,6 +113,7 @@ class VerdictNarrativeTest {
     @Test
     fun `local proxy without ips stays in local proxy status`() {
         val narrative = VerdictNarrativeBuilder.build(
+            context = context,
             result = result(
                 verdict = Verdict.NEEDS_REVIEW,
                 bypass = bypass(
@@ -120,6 +131,7 @@ class VerdictNarrativeTest {
     @Test
     fun `privacy mode masks ip rows`() {
         val narrative = VerdictNarrativeBuilder.build(
+            context = context,
             result = result(
                 verdict = Verdict.DETECTED,
                 bypass = bypass(
@@ -141,7 +153,7 @@ class VerdictNarrativeTest {
 
     @Test
     fun `empty result falls back to insufficient data`() {
-        val narrative = VerdictNarrativeBuilder.build(result())
+        val narrative = VerdictNarrativeBuilder.build(context = context, result = result())
 
         assertEquals(ExposureStatus.INSUFFICIENT_DATA, narrative.exposureStatus)
         assertTrue(narrative.explanation.contains("не нашла убедительных признаков"))

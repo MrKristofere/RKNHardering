@@ -1431,7 +1431,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        bindVerdictNarrative(VerdictNarrativeBuilder.build(result, privacyMode))
+        bindVerdictNarrative(VerdictNarrativeBuilder.build(this, result, privacyMode))
     }
 
     private fun bindVerdictNarrative(narrative: VerdictNarrative) {
