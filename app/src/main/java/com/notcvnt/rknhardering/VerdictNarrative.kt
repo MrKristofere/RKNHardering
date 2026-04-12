@@ -73,6 +73,7 @@ object VerdictNarrativeBuilder {
             localProxyEndpoint = result.bypassResult.proxyEndpoint?.let {
                 "${it.type.name} ${formatHostPort(it.host, it.port)}"
             },
+            ownerApp = result.bypassResult.proxyOwner?.let { LocalProxyOwnerFormatter.format(context, it) },
             vpnNetworkIp = gatewayLeakIpPair?.get(0)
                 ?: result.bypassResult.vpnNetworkIp
                 ?: vpnProbeFinding?.description?.let(::extractIps)?.firstOrNull(),
@@ -164,6 +165,7 @@ object VerdictNarrativeBuilder {
         }
 
         addRow(context.getString(R.string.narrative_label_local_proxy), snapshot.localProxyEndpoint)
+        addRow(context.getString(R.string.narrative_label_owner_app), snapshot.ownerApp)
         addRow(context.getString(R.string.narrative_label_vpn_network_ip), snapshot.vpnNetworkIp)
         addRow(context.getString(R.string.narrative_label_real_ip), snapshot.realIp)
         addRow(context.getString(R.string.narrative_label_direct_ip), snapshot.directIp)
@@ -309,6 +311,7 @@ object VerdictNarrativeBuilder {
         val remoteEndpoints: List<String>,
         val localApiEndpoint: String?,
         val localProxyEndpoint: String?,
+        val ownerApp: String?,
         val vpnNetworkIp: String?,
         val realIp: String?,
         val directIp: String?,

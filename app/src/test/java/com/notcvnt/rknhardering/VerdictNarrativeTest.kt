@@ -14,6 +14,7 @@ import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
+import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyType
@@ -148,6 +149,33 @@ class VerdictNarrativeTest {
             narrative.discoveredRows.any {
                 it.label == context.getString(R.string.narrative_label_local_proxy) &&
                     it.value.contains("127.0.0.1:1080")
+            },
+        )
+    }
+
+    @Test
+    fun `proxy owner is shown in discovered rows`() {
+        val narrative = VerdictNarrativeBuilder.build(
+            context = context,
+            result = result(
+                verdict = Verdict.NEEDS_REVIEW,
+                bypass = bypass(
+                    proxyEndpoint = ProxyEndpoint(host = "127.0.0.1", port = 1080, type = ProxyType.SOCKS5),
+                    proxyOwner = LocalProxyOwner(
+                        uid = 10123,
+                        packageNames = listOf("com.whatsapp"),
+                        appLabels = listOf("WhatsApp"),
+                        confidence = EvidenceConfidence.HIGH,
+                    ),
+                    needsReview = true,
+                ),
+            ),
+        )
+
+        assertTrue(
+            narrative.discoveredRows.any {
+                it.label == context.getString(R.string.narrative_label_owner_app) &&
+                    it.value.contains("WhatsApp")
             },
         )
     }
@@ -302,6 +330,7 @@ class VerdictNarrativeTest {
 
     private fun bypass(
         proxyEndpoint: ProxyEndpoint? = null,
+        proxyOwner: LocalProxyOwner? = null,
         directIp: String? = null,
         proxyIp: String? = null,
         vpnNetworkIp: String? = null,
@@ -313,6 +342,7 @@ class VerdictNarrativeTest {
         evidence: List<EvidenceItem> = emptyList(),
     ): BypassResult = BypassResult(
         proxyEndpoint = proxyEndpoint,
+        proxyOwner = proxyOwner,
         directIp = directIp,
         proxyIp = proxyIp,
         vpnNetworkIp = vpnNetworkIp,

@@ -129,6 +129,7 @@ object VpnCheckRunner {
         )
         val emptyBypass = BypassResult(
             proxyEndpoint = null,
+            proxyOwner = null,
             directIp = null,
             proxyIp = null,
             vpnNetworkIp = null,

@@ -152,6 +152,7 @@
     <string name="narrative_label_remote_endpoint">Remote endpoint</string>
     <string name="narrative_label_remote_endpoint_extra">Additional remote endpoint</string>
     <string name="narrative_label_local_proxy">Local proxy</string>
+    <string name="narrative_label_owner_app">Owner app</string>
     <string name="narrative_label_vpn_network_ip">IP via VPN Network</string>
     <string name="narrative_label_real_ip">IP outside VPN</string>
     <string name="narrative_label_direct_ip">Direct public IP</string>
@@ -180,6 +181,13 @@
     <!-- Checker strings -->
     <string name="checker_yes">yes</string>
     <string name="checker_no">no</string>
+    <string name="checker_proxy_owner_suffix"> (owner: %1$s)</string>
+    <string name="checker_proxy_owner_single">%1$s (%2$s, uid %3$d)</string>
+    <string name="checker_proxy_owner_named_uid">%1$s (uid %2$d)</string>
+    <string name="checker_proxy_owner_shared">uid %1$d: %2$s</string>
+    <string name="checker_proxy_owner_uid_only">uid %1$d</string>
+    <string name="checker_proxy_owner_unresolved">unresolved</string>
+    <string name="checker_proxy_owner_ambiguous">ambiguous</string>
 
     <!-- GeoIpChecker -->
     <string name="checker_geo_error_no_provider">No GeoIP provider returned data</string>

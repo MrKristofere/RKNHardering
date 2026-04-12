@@ -1,14 +1,18 @@
 package com.notcvnt.rknhardering.checker
 
 import android.content.Context
+import com.notcvnt.rknhardering.LocalProxyOwnerFormatter
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.IfconfigClient
+import com.notcvnt.rknhardering.probe.LocalSocketInspector
+import com.notcvnt.rknhardering.probe.LocalSocketListener
 import com.notcvnt.rknhardering.probe.MtProtoProber
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyScanner
@@ -27,6 +31,17 @@ object BypassChecker {
     internal data class UnderlyingEvaluation(
         val detected: Boolean,
         val needsReview: Boolean,
+    )
+
+    internal enum class ProxyOwnerStatus {
+        RESOLVED,
+        UNRESOLVED,
+        AMBIGUOUS,
+    }
+
+    internal data class ProxyOwnerMatch(
+        val owner: LocalProxyOwner? = null,
+        val status: ProxyOwnerStatus,
     )
 
     enum class ProgressLine {
@@ -163,8 +178,9 @@ object BypassChecker {
         val proxyEndpoint = proxyDeferred.await()
         val xrayApiScanResult = xrayDeferred.await()
         val underlyingResult = underlyingDeferred.await()
+        val proxyOwnerMatch = proxyEndpoint?.let { resolveProxyOwner(context, it) }
 
-        reportProxyResult(context, proxyEndpoint, findings, evidence)
+        reportProxyResult(context, proxyEndpoint, proxyOwnerMatch, findings, evidence)
         reportXrayApiResult(context, xrayApiScanResult, findings, evidence)
         val underlyingEvaluation = reportUnderlyingNetworkResult(context, underlyingResult, findings, evidence)
 
@@ -259,6 +275,7 @@ object BypassChecker {
 
         BypassResult(
             proxyEndpoint = proxyEndpoint,
+            proxyOwner = proxyOwnerMatch?.owner,
             directIp = directIp,
             proxyIp = proxyIp,
             vpnNetworkIp = underlyingResult.vpnIp,
@@ -274,6 +291,7 @@ object BypassChecker {
     private fun reportProxyResult(
         context: Context,
         proxyEndpoint: ProxyEndpoint?,
+        proxyOwnerMatch: ProxyOwnerMatch?,
         findings: MutableList<Finding>,
         evidence: MutableList<EvidenceItem>,
     ) {
@@ -297,6 +315,7 @@ object BypassChecker {
                 append(familySuffix)
                 append("]")
             }
+            append(formatOwnerSuffix(context, proxyOwnerMatch))
             append(context.getString(R.string.checker_bypass_open_proxy_review_suffix))
         }
 
@@ -307,6 +326,7 @@ object BypassChecker {
                 source = EvidenceSource.LOCAL_PROXY,
                 confidence = EvidenceConfidence.MEDIUM,
                 family = familySuffix,
+                packageName = LocalProxyOwnerFormatter.packageName(proxyOwnerMatch?.owner),
             ),
         )
         evidence.add(
@@ -314,8 +334,12 @@ object BypassChecker {
                 source = EvidenceSource.LOCAL_PROXY,
                 detected = true,
                 confidence = EvidenceConfidence.MEDIUM,
-                description = "Detected open ${proxyEndpoint.type.name} proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)}",
+                description = buildString {
+                    append("Detected open ${proxyEndpoint.type.name} proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)}")
+                    append(formatOwnerSuffix(context, proxyOwnerMatch))
+                },
                 family = familySuffix,
+                packageName = LocalProxyOwnerFormatter.packageName(proxyOwnerMatch?.owner),
             ),
         )
     }
@@ -585,6 +609,48 @@ object BypassChecker {
 
         return UnderlyingEvaluation(detected = detected, needsReview = needsReview)
     }
+
+    private fun resolveProxyOwner(context: Context, proxyEndpoint: ProxyEndpoint): ProxyOwnerMatch {
+        val listeners = LocalSocketInspector.collect(context, protocols = setOf("tcp", "tcp6"))
+        return matchProxyOwner(proxyEndpoint, listeners)
+    }
+
+    internal fun matchProxyOwner(proxyEndpoint: ProxyEndpoint, listeners: List<LocalSocketListener>): ProxyOwnerMatch {
+        val samePortListeners = listeners.filter { it.port == proxyEndpoint.port }
+        val exactMatches = samePortListeners.filter { normalizeHost(it.host) == normalizeHost(proxyEndpoint.host) }
+        if (exactMatches.size == 1) {
+            return exactMatches.single().owner?.let { ProxyOwnerMatch(it, ProxyOwnerStatus.RESOLVED) }
+                ?: ProxyOwnerMatch(status = ProxyOwnerStatus.UNRESOLVED)
+        }
+        if (exactMatches.size > 1) {
+            return ProxyOwnerMatch(status = ProxyOwnerStatus.AMBIGUOUS)
+        }
+
+        val fallbackMatches = samePortListeners.filter { listener ->
+            isAnyAddress(listener.host) || (isLoopback(listener.host) && isLoopback(proxyEndpoint.host))
+        }
+        return when (fallbackMatches.size) {
+            1 -> fallbackMatches.single().owner?.let { ProxyOwnerMatch(it, ProxyOwnerStatus.RESOLVED) }
+                ?: ProxyOwnerMatch(status = ProxyOwnerStatus.UNRESOLVED)
+            0 -> ProxyOwnerMatch(status = ProxyOwnerStatus.UNRESOLVED)
+            else -> ProxyOwnerMatch(status = ProxyOwnerStatus.AMBIGUOUS)
+        }
+    }
+
+    private fun formatOwnerSuffix(context: Context, proxyOwnerMatch: ProxyOwnerMatch?): String {
+        val ownerText = when (proxyOwnerMatch?.status) {
+            ProxyOwnerStatus.RESOLVED -> proxyOwnerMatch.owner?.let { LocalProxyOwnerFormatter.format(context, it) }
+            ProxyOwnerStatus.AMBIGUOUS -> context.getString(R.string.checker_proxy_owner_ambiguous)
+            ProxyOwnerStatus.UNRESOLVED, null -> context.getString(R.string.checker_proxy_owner_unresolved)
+        } ?: context.getString(R.string.checker_proxy_owner_unresolved)
+        return context.getString(R.string.checker_proxy_owner_suffix, ownerText)
+    }
+
+    private fun normalizeHost(host: String): String = host.substringBefore('%').lowercase()
+
+    private fun isAnyAddress(host: String): Boolean = host == "0.0.0.0" || host == "::" || host == ":::"
+
+    private fun isLoopback(host: String): Boolean = host == "::1" || host.startsWith("127.")
 
     private fun formatHostPort(host: String, port: Int): String {
         return if (host.contains(':')) "[$host]:$port" else "$host:$port"

@@ -147,6 +147,7 @@
     <string name="narrative_label_remote_endpoint">نقطه پایانی راه‌دور</string>
     <string name="narrative_label_remote_endpoint_extra">نقطه پایانی راه‌دور اضافی</string>
     <string name="narrative_label_local_proxy">proxy محلی</string>
+    <string name="narrative_label_owner_app">برنامه مالک</string>
     <string name="narrative_label_vpn_network_ip">IP از طریق VPN Network</string>
     <string name="narrative_label_real_ip">IP خارج از VPN</string>
     <string name="narrative_label_direct_ip">IP عمومی مستقیم</string>
@@ -173,6 +174,13 @@
 
     <string name="checker_yes">بله</string>
     <string name="checker_no">خیر</string>
+    <string name="checker_proxy_owner_suffix"> (مالک: %1$s)</string>
+    <string name="checker_proxy_owner_single">%1$s (%2$s، uid %3$d)</string>
+    <string name="checker_proxy_owner_named_uid">%1$s (uid %2$d)</string>
+    <string name="checker_proxy_owner_shared">uid %1$d: %2$s</string>
+    <string name="checker_proxy_owner_uid_only">uid %1$d</string>
+    <string name="checker_proxy_owner_unresolved">نامشخص</string>
+    <string name="checker_proxy_owner_ambiguous">چند مالک محتمل</string>
 
     <string name="checker_geo_error_no_provider">هیچ ارائه‌دهنده GeoIP داده‌ای برنگرداند</string>
     <string name="checker_geo_error_fetch">دریافت داده‌های GeoIP ممکن نشد: %1$s</string>

@@ -154,6 +154,7 @@
     <string name="narrative_label_remote_endpoint">Адрес удалённого узла</string>
     <string name="narrative_label_remote_endpoint_extra">Доп. адрес удалённого узла</string>
     <string name="narrative_label_local_proxy">Локальный proxy</string>
+    <string name="narrative_label_owner_app">Приложение-владелец</string>
     <string name="narrative_label_vpn_network_ip">IP через VPN Network</string>
     <string name="narrative_label_real_ip">IP вне VPN</string>
     <string name="narrative_label_direct_ip">Публичный IP напрямую</string>
@@ -182,6 +183,13 @@
     <!-- Checker strings -->
     <string name="checker_yes">да</string>
     <string name="checker_no">нет</string>
+    <string name="checker_proxy_owner_suffix"> (владелец: %1$s)</string>
+    <string name="checker_proxy_owner_single">%1$s (%2$s, uid %3$d)</string>
+    <string name="checker_proxy_owner_named_uid">%1$s (uid %2$d)</string>
+    <string name="checker_proxy_owner_shared">uid %1$d: %2$s</string>
+    <string name="checker_proxy_owner_uid_only">uid %1$d</string>
+    <string name="checker_proxy_owner_unresolved">не определён</string>
+    <string name="checker_proxy_owner_ambiguous">несколько кандидатов</string>
 
     <!-- GeoIpChecker -->
     <string name="checker_geo_error_no_provider">Ни один GeoIP-провайдер не вернул данные</string>

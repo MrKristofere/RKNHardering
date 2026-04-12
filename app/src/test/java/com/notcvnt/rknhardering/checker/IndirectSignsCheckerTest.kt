@@ -6,7 +6,9 @@ import com.notcvnt.rknhardering.checker.IndirectSignsChecker.DnsClassification
 import com.notcvnt.rknhardering.checker.IndirectSignsChecker.InterfaceAddressSnapshot
 import com.notcvnt.rknhardering.checker.IndirectSignsChecker.NetworkSnapshot
 import com.notcvnt.rknhardering.checker.IndirectSignsChecker.RouteSnapshot
+import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.probe.LocalSocketInspector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -55,6 +57,57 @@ class IndirectSignsCheckerTest {
         assertEquals(1, listeners.size)
         assertEquals("127.0.0.1", listeners.single().host)
         assertEquals(9090, listeners.single().port)
+        assertEquals(0, listeners.single().uid)
+        assertEquals(0L, listeners.single().inode)
+    }
+
+    @Test
+    fun `resolves owner for a single visible package`() {
+        val owner = LocalSocketInspector.resolveOwner(
+            uid = 10123,
+            packageNames = listOf("com.whatsapp"),
+            uidName = "u0a123",
+            appLabelResolver = { "WhatsApp" },
+        )
+
+        assertEquals(10123, owner.uid)
+        assertEquals(listOf("com.whatsapp"), owner.packageNames)
+        assertEquals(listOf("WhatsApp"), owner.appLabels)
+        assertEquals(EvidenceConfidence.HIGH, owner.confidence)
+    }
+
+    @Test
+    fun `resolves owner for shared uid packages`() {
+        val owner = LocalSocketInspector.resolveOwner(
+            uid = 10124,
+            packageNames = listOf("com.example.first", "com.example.second"),
+            uidName = "u0a124",
+            appLabelResolver = { packageName ->
+                when (packageName) {
+                    "com.example.first" -> "First"
+                    "com.example.second" -> "Second"
+                    else -> null
+                }
+            },
+        )
+
+        assertEquals(listOf("com.example.first", "com.example.second"), owner.packageNames)
+        assertEquals(listOf("First", "Second"), owner.appLabels)
+        assertEquals(EvidenceConfidence.MEDIUM, owner.confidence)
+    }
+
+    @Test
+    fun `resolves owner to uid fallback when package list is unavailable`() {
+        val owner = LocalSocketInspector.resolveOwner(
+            uid = 10125,
+            packageNames = emptyList(),
+            uidName = "u0a125",
+            appLabelResolver = { null },
+        )
+
+        assertEquals(emptyList<String>(), owner.packageNames)
+        assertEquals(listOf("u0a125"), owner.appLabels)
+        assertEquals(EvidenceConfidence.LOW, owner.confidence)
     }
 
     @Test

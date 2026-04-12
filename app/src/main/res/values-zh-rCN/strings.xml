@@ -146,6 +146,7 @@
     <string name="narrative_label_remote_endpoint">远程节点</string>
     <string name="narrative_label_remote_endpoint_extra">额外远程节点</string>
     <string name="narrative_label_local_proxy">本地代理</string>
+    <string name="narrative_label_owner_app">所有者应用</string>
     <string name="narrative_label_vpn_network_ip">通过 VPN Network 获取的 IP</string>
     <string name="narrative_label_real_ip">VPN 外部 IP</string>
     <string name="narrative_label_direct_ip">直接公网 IP</string>
@@ -172,6 +173,13 @@
 
     <string name="checker_yes">是</string>
     <string name="checker_no">否</string>
+    <string name="checker_proxy_owner_suffix">（所有者：%1$s）</string>
+    <string name="checker_proxy_owner_single">%1$s（%2$s，uid %3$d）</string>
+    <string name="checker_proxy_owner_named_uid">%1$s（uid %2$d）</string>
+    <string name="checker_proxy_owner_shared">uid %1$d：%2$s</string>
+    <string name="checker_proxy_owner_uid_only">uid %1$d</string>
+    <string name="checker_proxy_owner_unresolved">无法确定</string>
+    <string name="checker_proxy_owner_ambiguous">存在多个候选所有者</string>
 
     <string name="checker_geo_error_no_provider">没有任何 GeoIP 提供方返回数据</string>
     <string name="checker_geo_error_fetch">无法获取 GeoIP 数据：%1$s</string>

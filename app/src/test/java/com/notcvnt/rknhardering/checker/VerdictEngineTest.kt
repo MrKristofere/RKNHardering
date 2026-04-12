@@ -231,6 +231,7 @@ class VerdictEngineTest {
         needsReview: Boolean = false,
     ): BypassResult = BypassResult(
         proxyEndpoint = null,
+        proxyOwner = null,
         directIp = null,
         proxyIp = null,
         vpnNetworkIp = null,

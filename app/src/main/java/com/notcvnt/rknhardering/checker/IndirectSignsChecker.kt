@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
+import com.notcvnt.rknhardering.LocalProxyOwnerFormatter
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.ActiveVpnApp
 import com.notcvnt.rknhardering.model.CategoryResult
@@ -10,6 +11,8 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.probe.LocalSocketInspector
+import com.notcvnt.rknhardering.probe.LocalSocketListener
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
 import com.notcvnt.rknhardering.vpn.VpnClientSignal
 import com.notcvnt.rknhardering.vpn.VpnDumpsysParser
@@ -54,13 +57,6 @@ object IndirectSignsChecker {
         val routes: List<RouteSnapshot>,
         val dnsServers: List<String>,
         val interfaceAddresses: List<InterfaceAddressSnapshot>,
-    )
-
-    internal data class LocalListener(
-        val protocol: String,
-        val host: String,
-        val port: Int,
-        val state: String,
     )
 
     internal data class RoutingEvaluation(
@@ -644,7 +640,7 @@ object IndirectSignsChecker {
 
     private fun checkProxyTechnicalSignals(context: Context): ProxyTechnicalEvaluation {
         val installedProxyTools = detectInstalledProxyTools(context)
-        val listeners = collectLocalListeners()
+        val listeners = collectLocalListeners(context)
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
         var detected = false
@@ -686,18 +682,21 @@ object IndirectSignsChecker {
         }
         if (loopbackListeners.isNotEmpty()) {
             for (listener in loopbackListeners.distinctBy { Triple(it.protocol, it.host, it.port) }) {
-                val description = context.getString(
+                val baseDescription = context.getString(
                     R.string.checker_indirect_local_listener,
                     listener.host,
                     listener.port,
                     listener.protocol,
                 )
+                val ownerSuffix = formatOwnerSuffix(context, listener.owner)
+                val description = baseDescription + ownerSuffix
                 findings.add(
                     Finding(
                         description = description,
                         detected = true,
                         source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
                         confidence = EvidenceConfidence.MEDIUM,
+                        packageName = LocalProxyOwnerFormatter.packageName(listener.owner),
                     ),
                 )
                 evidence.add(
@@ -706,6 +705,7 @@ object IndirectSignsChecker {
                         detected = true,
                         confidence = EvidenceConfidence.MEDIUM,
                         description = description,
+                        packageName = LocalProxyOwnerFormatter.packageName(listener.owner),
                     ),
                 )
             }
@@ -756,30 +756,8 @@ object IndirectSignsChecker {
         )
     }
 
-    internal fun parseProcNetListeners(lines: List<String>, protocol: String): List<LocalListener> {
-        return lines.drop(1).mapNotNull { line ->
-            val parts = line.trim().split("\\s+".toRegex())
-            if (parts.size < 4) return@mapNotNull null
-
-            val localAddress = parts[1]
-            val state = parts[3]
-            if (protocol.startsWith("tcp") && state != "0A") return@mapNotNull null
-            if (protocol.startsWith("udp") && state !in setOf("07", "0A")) return@mapNotNull null
-
-            val hostPort = localAddress.split(":")
-            if (hostPort.size != 2) return@mapNotNull null
-
-            val host = decodeProcAddress(hostPort[0], ipv6 = protocol.endsWith("6")) ?: return@mapNotNull null
-            val port = hostPort[1].toIntOrNull(16) ?: return@mapNotNull null
-
-            LocalListener(
-                protocol = protocol,
-                host = host.lowercase(),
-                port = port,
-                state = state,
-            )
-        }
-    }
+    internal fun parseProcNetListeners(lines: List<String>, protocol: String): List<LocalSocketListener> =
+        LocalSocketInspector.parseProcNetListeners(lines, protocol)
 
     private fun detectInstalledProxyTools(context: Context): Set<String> {
         val pm = context.packageManager
@@ -798,33 +776,7 @@ object IndirectSignsChecker {
         }
     }
 
-    private fun collectLocalListeners(): List<LocalListener> {
-        val files = listOf(
-            "tcp" to "/proc/net/tcp",
-            "tcp6" to "/proc/net/tcp6",
-            "udp" to "/proc/net/udp",
-            "udp6" to "/proc/net/udp6",
-        )
-        return files.flatMap { (protocol, path) ->
-            val file = File(path)
-            if (!file.exists()) return@flatMap emptyList()
-            runCatching {
-                BufferedReader(FileReader(file)).use { reader ->
-                    parseProcNetListeners(reader.readLines(), protocol)
-                }
-            }.getOrDefault(emptyList())
-        }
-    }
-
-    private fun decodeProcAddress(hexAddress: String, ipv6: Boolean): String? {
-        return try {
-            val bytes = hexAddress.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-            val orderedBytes = if (ipv6) bytes else bytes.reversedArray()
-            InetAddress.getByAddress(orderedBytes).hostAddress
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private fun collectLocalListeners(context: Context): List<LocalSocketListener> = LocalSocketInspector.collect(context)
 
     private fun collectProcDefaultRouteInterfaces(): List<String> {
         return try {
@@ -868,6 +820,12 @@ object IndirectSignsChecker {
     private fun isLoopbackOrAnyAddress(host: String): Boolean {
         return host == "0.0.0.0" || host == "::" || host == ":::" ||
             host == "::1" || host.startsWith("127.")
+    }
+
+    private fun formatOwnerSuffix(context: Context, owner: com.notcvnt.rknhardering.model.LocalProxyOwner?): String {
+        val ownerText = owner?.let { LocalProxyOwnerFormatter.format(context, it) }
+            ?: context.getString(R.string.checker_proxy_owner_unresolved)
+        return context.getString(R.string.checker_proxy_owner_suffix, ownerText)
     }
 
     private fun normalizeIpAddress(addr: String): String = addr.substringBefore('%').lowercase()

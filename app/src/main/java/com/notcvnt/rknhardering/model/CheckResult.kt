@@ -77,6 +77,13 @@ data class ActiveVpnApp(
     val confidence: EvidenceConfidence,
 )
 
+data class LocalProxyOwner(
+    val uid: Int,
+    val packageNames: List<String>,
+    val appLabels: List<String>,
+    val confidence: EvidenceConfidence,
+)
+
 data class CategoryResult(
     val name: String,
     val detected: Boolean,
@@ -98,6 +105,7 @@ enum class Verdict {
 
 data class BypassResult(
     val proxyEndpoint: ProxyEndpoint?,
+    val proxyOwner: LocalProxyOwner? = null,
     val directIp: String?,
     val proxyIp: String?,
     val vpnNetworkIp: String? = null,
