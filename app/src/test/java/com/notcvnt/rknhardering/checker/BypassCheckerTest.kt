@@ -7,6 +7,10 @@ import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.probe.LocalSocketListener
+import com.notcvnt.rknhardering.probe.PublicIpModeProbeResult
+import com.notcvnt.rknhardering.probe.PublicIpNetworkComparison
+import com.notcvnt.rknhardering.probe.PublicIpProbeMode
+import com.notcvnt.rknhardering.probe.PublicIpProbeStatus
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
@@ -229,6 +233,125 @@ class BypassCheckerTest {
         assertTrue(outcome.needsReview)
         assertFalse(evidence.any { it.source == EvidenceSource.VPN_NETWORK_BINDING && it.detected })
         assertTrue(findings.any { it.needsReview && it.description.contains("different IP families") })
+    }
+
+    @Test
+    fun `gateway leak falls back to needs review when vpn comparison relies on curl compatible fallback`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val outcome = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                vpnIp = "198.51.100.10",
+                underlyingIp = "203.0.113.20",
+                vpnIpComparison = PublicIpNetworkComparison(
+                    strict = PublicIpModeProbeResult(
+                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                        status = PublicIpProbeStatus.FAILED,
+                        error = "strict timeout",
+                    ),
+                    curlCompatible = PublicIpModeProbeResult(
+                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        status = PublicIpProbeStatus.SUCCEEDED,
+                        ip = "198.51.100.10",
+                    ),
+                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                    selectedIp = "198.51.100.10",
+                    dnsPathMismatch = true,
+                ),
+                activeNetworkIsVpn = true,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertFalse(outcome.detected)
+        assertTrue(outcome.needsReview)
+        assertFalse(evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected })
+        assertTrue(findings.any { it.needsReview && it.source == EvidenceSource.VPN_GATEWAY_LEAK })
+        assertTrue(findings.any { it.isInformational && it.description.contains("curl-compatible transport-only fallback") })
+    }
+
+    @Test
+    fun `vpn binding falls back to needs review when comparison relies on curl compatible fallback`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val outcome = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                vpnIp = "203.0.113.10",
+                underlyingIp = "198.51.100.10",
+                vpnIpComparison = PublicIpNetworkComparison(
+                    strict = PublicIpModeProbeResult(
+                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                        status = PublicIpProbeStatus.FAILED,
+                        error = "strict timeout",
+                    ),
+                    curlCompatible = PublicIpModeProbeResult(
+                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        status = PublicIpProbeStatus.SUCCEEDED,
+                        ip = "203.0.113.10",
+                    ),
+                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                    selectedIp = "203.0.113.10",
+                    dnsPathMismatch = true,
+                ),
+                activeNetworkIsVpn = false,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertFalse(outcome.detected)
+        assertTrue(outcome.needsReview)
+        assertTrue(findings.any { it.isInformational && it.description.contains("curl-compatible transport-only fallback") })
+        assertTrue(findings.any { it.needsReview && it.source == EvidenceSource.VPN_NETWORK_BINDING })
+        assertFalse(evidence.any { it.source == EvidenceSource.VPN_NETWORK_BINDING && it.detected })
+    }
+
+    @Test
+    fun `transport only fallback does not reintroduce review when merged vpn ip is present`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val outcome = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                vpnIp = "203.0.113.10",
+                underlyingIp = "203.0.113.10",
+                vpnIpComparison = PublicIpNetworkComparison(
+                    strict = PublicIpModeProbeResult(
+                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                        status = PublicIpProbeStatus.FAILED,
+                        error = "strict timeout",
+                    ),
+                    curlCompatible = PublicIpModeProbeResult(
+                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        status = PublicIpProbeStatus.SUCCEEDED,
+                        ip = "203.0.113.10",
+                    ),
+                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                    selectedIp = "203.0.113.10",
+                    dnsPathMismatch = true,
+                ),
+                activeNetworkIsVpn = false,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertFalse(outcome.detected)
+        assertFalse(outcome.needsReview)
+        assertTrue(findings.any { it.isInformational && it.description.contains("curl-compatible transport-only fallback") })
+        assertFalse(findings.any { it.needsReview && it.description.contains("strict timeout") })
     }
 
     @Test

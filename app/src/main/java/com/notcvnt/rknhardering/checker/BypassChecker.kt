@@ -16,6 +16,7 @@ import com.notcvnt.rknhardering.probe.LocalSocketListener
 import com.notcvnt.rknhardering.probe.MtProtoProber
 import com.notcvnt.rknhardering.probe.PortScanPlanner
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
+import com.notcvnt.rknhardering.probe.PublicIpProbeMode
 import com.notcvnt.rknhardering.probe.ProxyScanner
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.ScanMode
@@ -494,31 +495,48 @@ object BypassChecker {
                 ),
             )
         }
+        val usedTransportOnlyFallback = addTransportOnlyFinding(context, result, findings)
 
         if (result.activeNetworkIsVpn == false) {
             when {
                 ipsAreDifferent -> {
-                    findings.add(
-                        Finding(
-                            description = context.getString(
-                                R.string.checker_bypass_vpn_network_binding,
-                                result.vpnIp,
-                                result.underlyingIp,
+                    if (usedTransportOnlyFallback) {
+                        findings.add(
+                            Finding(
+                                description = context.getString(
+                                    R.string.checker_bypass_vpn_network_binding,
+                                    result.vpnIp,
+                                    result.underlyingIp,
+                                ),
+                                needsReview = true,
+                                source = EvidenceSource.VPN_NETWORK_BINDING,
+                                confidence = EvidenceConfidence.LOW,
                             ),
-                            detected = true,
-                            source = EvidenceSource.VPN_NETWORK_BINDING,
-                            confidence = EvidenceConfidence.HIGH,
-                        ),
-                    )
-                    evidence.add(
-                        EvidenceItem(
-                            source = EvidenceSource.VPN_NETWORK_BINDING,
-                            detected = true,
-                            confidence = EvidenceConfidence.HIGH,
-                            description = "Bound VPN IP differs from the default non-VPN IP",
-                        ),
-                    )
-                    detected = true
+                        )
+                        needsReview = true
+                    } else {
+                        findings.add(
+                            Finding(
+                                description = context.getString(
+                                    R.string.checker_bypass_vpn_network_binding,
+                                    result.vpnIp,
+                                    result.underlyingIp,
+                                ),
+                                detected = true,
+                                source = EvidenceSource.VPN_NETWORK_BINDING,
+                                confidence = EvidenceConfidence.HIGH,
+                            ),
+                        )
+                        evidence.add(
+                            EvidenceItem(
+                                source = EvidenceSource.VPN_NETWORK_BINDING,
+                                detected = true,
+                                confidence = EvidenceConfidence.HIGH,
+                                description = "Bound VPN IP differs from the default non-VPN IP",
+                            ),
+                        )
+                        detected = true
+                    }
                 }
                 hasComparableIps -> {
                     val ipSuffix = result.underlyingIp?.let { " ($it)" }.orEmpty()
@@ -597,6 +615,17 @@ object BypassChecker {
                 result.vpnIp,
                 result.underlyingIp,
             )
+            if (usedTransportOnlyFallback) {
+                findings.add(
+                    Finding(
+                        description = description,
+                        needsReview = true,
+                        source = EvidenceSource.VPN_GATEWAY_LEAK,
+                        confidence = EvidenceConfidence.LOW,
+                    ),
+                )
+                return UnderlyingEvaluation(detected = false, needsReview = true)
+            }
             findings.add(
                 Finding(
                     description = description,
@@ -661,6 +690,38 @@ object BypassChecker {
         }
 
         return UnderlyingEvaluation(detected = detected, needsReview = needsReview)
+    }
+
+    private fun addTransportOnlyFinding(
+        context: Context,
+        result: UnderlyingNetworkProber.ProbeResult,
+        findings: MutableList<Finding>,
+    ): Boolean {
+        val pathLabels = mutableListOf<String>()
+        if (
+            result.vpnIp != null &&
+            result.vpnIpComparison?.selectedMode == PublicIpProbeMode.CURL_COMPATIBLE
+        ) {
+            pathLabels += context.getString(R.string.checker_bypass_transport_only_vpn_path)
+        }
+        if (
+            result.underlyingIp != null &&
+            result.underlyingIpComparison?.selectedMode == PublicIpProbeMode.CURL_COMPATIBLE
+        ) {
+            pathLabels += context.getString(R.string.checker_bypass_transport_only_underlying_path)
+        }
+        if (pathLabels.isEmpty()) return false
+
+        findings.add(
+            Finding(
+                description = context.getString(
+                    R.string.checker_bypass_transport_only_used,
+                    pathLabels.joinToString(", "),
+                ),
+                isInformational = true,
+            ),
+        )
+        return true
     }
 
     private fun resolveProxyOwner(context: Context, proxyEndpoint: ProxyEndpoint): ProxyOwnerMatch {
