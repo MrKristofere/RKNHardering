@@ -41,6 +41,10 @@ import com.notcvnt.rknhardering.checker.BypassChecker
 import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
+import com.notcvnt.rknhardering.model.CallTransportService
+import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CategoryResult
@@ -160,6 +164,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardDirect: MaterialCardView
     private lateinit var cardIndirect: MaterialCardView
     private lateinit var cardLocation: MaterialCardView
+    private lateinit var cardCallTransport: MaterialCardView
+    private lateinit var iconCallTransport: ImageView
+    private lateinit var statusCallTransport: TextView
+    private lateinit var findingsCallTransport: LinearLayout
     private lateinit var cardVerdict: MaterialCardView
     private lateinit var iconGeoIp: ImageView
     private lateinit var iconIpComparison: ImageView
@@ -285,6 +293,10 @@ class MainActivity : AppCompatActivity() {
         cardDirect = findViewById(R.id.cardDirect)
         cardIndirect = findViewById(R.id.cardIndirect)
         cardLocation = findViewById(R.id.cardLocation)
+        cardCallTransport = findViewById(R.id.cardCallTransport)
+        iconCallTransport = findViewById(R.id.iconCallTransport)
+        statusCallTransport = findViewById(R.id.statusCallTransport)
+        findingsCallTransport = findViewById(R.id.findingsCallTransport)
         cardVerdict = findViewById(R.id.cardVerdict)
         iconGeoIp = findViewById(R.id.iconGeoIp)
         iconIpComparison = findViewById(R.id.iconIpComparison)
@@ -369,7 +381,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun shouldRequestPhoneStatePermission(): Boolean {
         return packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY) ||
-            packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
+            (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
+                )
     }
 
     private fun permissionRationaleMessage(): String {
@@ -759,6 +774,14 @@ class MainActivity : AppCompatActivity() {
                     activeCheckPrivacyMode,
                 )
                 if (animate) animateContentReveal(findingsIndirect)
+
+                val callTransportEnabled = prefs.getBoolean(
+                    SettingsActivity.PREF_CALL_TRANSPORT_PROBE_ENABLED, false,
+                )
+                if (callTransportEnabled) {
+                    displayCallTransport(update.result.callTransportLeaks, activeCheckPrivacyMode)
+                    if (animate) animateContentReveal(findingsCallTransport)
+                }
             }
             is CheckUpdate.LocationSignalsReady -> {
                 markStageCompleted(RunningStage.LOCATION)
@@ -1174,6 +1197,7 @@ class MainActivity : AppCompatActivity() {
             cardCdnPulling,
             cardDirect,
             cardIndirect,
+            cardCallTransport,
             cardLocation,
             cardBypass,
             cardVerdict,
@@ -1655,6 +1679,115 @@ class MainActivity : AppCompatActivity() {
         for (finding in bypass.findings) {
             findingsBypass.addView(createFindingView(finding, privacyMode))
         }
+    }
+
+    private fun displayCallTransport(leaks: List<CallTransportLeakResult>, privacyMode: Boolean) {
+        if (leaks.isEmpty()) {
+            cardCallTransport.visibility = View.GONE
+            return
+        }
+        cardCallTransport.visibility = View.VISIBLE
+
+        val hasNeedsReview = leaks.any { it.status == CallTransportStatus.NEEDS_REVIEW }
+        val hasError = leaks.any { it.status == CallTransportStatus.ERROR }
+        bindCardStatus(
+            detected = false,
+            needsReview = hasNeedsReview,
+            icon = iconCallTransport,
+            status = statusCallTransport,
+            hasError = hasError && !hasNeedsReview,
+        )
+
+        findingsCallTransport.removeAllViews()
+        findingsCallTransport.visibility = View.VISIBLE
+        for (leak in leaks) {
+            findingsCallTransport.addView(createCallTransportLeakView(leak, privacyMode))
+        }
+    }
+
+    private fun createCallTransportLeakView(leak: CallTransportLeakResult, privacyMode: Boolean): View {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 4.dp, 0, 4.dp)
+        }
+
+        val statusLabel = when (leak.status) {
+            CallTransportStatus.NO_SIGNAL -> getString(R.string.main_card_call_transport_status_no_signal)
+            CallTransportStatus.NEEDS_REVIEW -> getString(R.string.main_card_call_transport_status_needs_review)
+            CallTransportStatus.UNSUPPORTED -> getString(R.string.main_card_call_transport_status_unsupported)
+            CallTransportStatus.ERROR -> getString(R.string.main_card_call_transport_status_error)
+        }
+        val pathLabel = when (leak.networkPath) {
+            CallTransportNetworkPath.ACTIVE -> getString(R.string.main_card_call_transport_path_active)
+            CallTransportNetworkPath.UNDERLYING -> getString(R.string.main_card_call_transport_path_underlying)
+            CallTransportNetworkPath.LOCAL_PROXY -> getString(R.string.main_card_call_transport_path_proxy)
+        }
+        val serviceLabel = when (leak.service) {
+            CallTransportService.TELEGRAM -> "Telegram"
+            CallTransportService.WHATSAPP -> "WhatsApp"
+        }
+        val statusColor = when (leak.status) {
+            CallTransportStatus.NEEDS_REVIEW -> R.color.status_amber
+            CallTransportStatus.ERROR -> R.color.status_amber
+            CallTransportStatus.NO_SIGNAL -> R.color.status_green
+            CallTransportStatus.UNSUPPORTED -> R.color.md_on_surface_variant
+        }
+
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val indicator = TextView(this).apply {
+            text = when (leak.status) {
+                CallTransportStatus.NEEDS_REVIEW -> "?"
+                CallTransportStatus.ERROR -> "\u26A0"
+                CallTransportStatus.NO_SIGNAL -> "\u2713"
+                CallTransportStatus.UNSUPPORTED -> "\u2014"
+            }
+            setTextColor(ContextCompat.getColor(this@MainActivity, statusColor))
+            textSize = 14f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 8.dp, 0)
+        }
+        val headerText = TextView(this).apply {
+            text = "$serviceLabel \u00B7 $pathLabel \u00B7 $statusLabel"
+            textSize = 13f
+            val tv = android.util.TypedValue()
+            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
+            setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        headerRow.addView(indicator)
+        headerRow.addView(headerText)
+        container.addView(headerRow)
+
+        val target = leak.targetHost
+        if (target != null) {
+            val port = leak.targetPort
+            val targetStr = if (port != null) {
+                if (target.contains(':')) "[$target]:$port" else "$target:$port"
+            } else target
+            container.addView(createInfoView(
+                label = "target",
+                value = if (privacyMode) maskIp(targetStr) else targetStr,
+            ))
+        }
+        val mappedIp = leak.mappedIp
+        if (!mappedIp.isNullOrBlank()) {
+            container.addView(createInfoView(
+                label = "mapped IP",
+                value = if (privacyMode) maskIp(mappedIp) else mappedIp,
+            ))
+        }
+        val publicIp = leak.observedPublicIp
+        if (!publicIp.isNullOrBlank()) {
+            container.addView(createInfoView(
+                label = "public IP",
+                value = if (privacyMode) maskIp(publicIp) else publicIp,
+            ))
+        }
+
+        return container
     }
 
     private fun updateBypassProgress(progress: BypassChecker.Progress) {
