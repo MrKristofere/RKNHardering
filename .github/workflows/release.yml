@@ -78,7 +78,7 @@ jobs:
       - name: Rename APK
         run: |
           VERSION=${{ steps.version.outputs.tag }}
-          mv app/build/outputs/apk/debug/app-dubug.apk \
+          mv app/build/outputs/apk/debug/app-debug.apk \
              app/build/outputs/apk/debug/RKNHardering-${VERSION}.apk
 
       - name: Generate changelog
