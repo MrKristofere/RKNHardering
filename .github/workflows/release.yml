@@ -78,8 +78,8 @@ jobs:
       - name: Rename APK
         run: |
           VERSION=${{ steps.version.outputs.tag }}
-          mv app/build/outputs/apk/release/app-release.apk \
-             app/build/outputs/apk/release/RKNHardering-${VERSION}.apk
+          mv app/build/outputs/apk/debug/app-dubug.apk \
+             app/build/outputs/apk/debug/RKNHardering-${VERSION}.apk
 
       - name: Generate changelog
         id: changelog
@@ -106,6 +106,6 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           body: ${{ steps.changelog.outputs.notes }}
-          files: app/build/outputs/apk/release/RKNHardering-${{ steps.version.outputs.tag }}.apk
+          files: app/build/outputs/apk/debug/RKNHardering-${{ steps.version.outputs.tag }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
