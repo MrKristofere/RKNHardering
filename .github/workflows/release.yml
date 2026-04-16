@@ -73,7 +73,7 @@ jobs:
       - name: Build debug APK
         run: |
           ./gradlew assembleDebug \
-          -PappVersionName=${{ steps.android_version.outputs.name }}
+            -PappVersionName=${{ steps.android_version.outputs.name }}
 
       - name: Rename APK
         run: |
