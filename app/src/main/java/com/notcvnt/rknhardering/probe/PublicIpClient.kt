@@ -196,6 +196,8 @@ object PublicIpClient {
             config = request.config,
             proxy = request.proxy,
             binding = request.binding,
+            addressFamily = request.addressFamily,
+            cancellationSignal = request.cancellationSignal,
         )
         TransportPolicy.NATIVE_CURL_ONLY -> {
             if (!NativeCurlHttpClient.canExecute(request)) {

@@ -65,13 +65,13 @@ object IpComparisonChecker {
         ),
         EndpointSpec(
             label = "ifconfig.me IPv4",
-            url = "https://ipv4.ifconfig.me/ip",
+            url = "https://ifconfig.me/ip",
             scope = IpCheckerScope.NON_RU,
             addressFamily = Inet4Address::class.java,
         ),
         EndpointSpec(
             label = "ifconfig.me IPv6",
-            url = "https://ipv6.ifconfig.me/ip",
+            url = "https://ifconfig.me/ip",
             scope = IpCheckerScope.NON_RU,
             addressFamily = Inet6Address::class.java,
         ),

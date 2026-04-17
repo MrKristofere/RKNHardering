@@ -103,7 +103,7 @@ class CdnPullingCheckerTest {
             resolverConfig = DnsResolverConfig.system(),
             maxAttempts = 3,
             retryDelayMs = 0,
-        ) { _, _, _ ->
+        ) { _, _, _, _ ->
             attempts += 1
             if (attempts < 3) {
                 Result.failure(IOException("timeout"))
@@ -130,7 +130,7 @@ class CdnPullingCheckerTest {
             resolverConfig = DnsResolverConfig.system(),
             maxAttempts = 3,
             retryDelayMs = 0,
-        ) { _, _, _ ->
+        ) { _, _, _, _ ->
             attempts += 1
             Result.failure(error)
         }
