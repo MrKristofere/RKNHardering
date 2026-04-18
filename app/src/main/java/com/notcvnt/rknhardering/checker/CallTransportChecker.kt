@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import com.notcvnt.rknhardering.BuildConfig
 import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
 import com.notcvnt.rknhardering.model.CallTransportNetworkPath
@@ -15,6 +14,9 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.StunProbeGroupResult
+import com.notcvnt.rknhardering.model.StunProbeResult
+import com.notcvnt.rknhardering.model.StunScope
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.NetworkInterfaceNameNormalizer
 import com.notcvnt.rknhardering.network.ResolverBinding
@@ -32,7 +34,6 @@ import com.notcvnt.rknhardering.probe.Socks5UdpAssociateClient
 import com.notcvnt.rknhardering.probe.StunBindingClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.InetAddress
 
 object CallTransportChecker {
 
@@ -45,18 +46,19 @@ object CallTransportChecker {
 
     data class Evaluation(
         val results: List<CallTransportLeakResult> = emptyList(),
+        val stunGroups: List<StunProbeGroupResult> = emptyList(),
         val findings: List<Finding> = emptyList(),
         val evidence: List<EvidenceItem> = emptyList(),
         val needsReview: Boolean = false,
     )
 
     internal data class Dependencies(
-        val loadCatalog: (Context, Boolean) -> CallTransportTargetCatalog.Catalog =
-            CallTransportTargetCatalog::load,
+        val loadCatalog: (Context) -> CallTransportTargetCatalog.Catalog =
+            { ctx -> CallTransportTargetCatalog.load(ctx) },
         val loadPaths: (Context) -> List<PathDescriptor> = ::loadNetworkPaths,
-        val stunProbe: (CallTransportTargetCatalog.CallTransportTarget, DnsResolverConfig, ResolverBinding?) -> Result<StunBindingClient.BindingResult> =
+        val stunDualStackProbe: (CallTransportTargetCatalog.StunTarget, DnsResolverConfig, ResolverBinding?) -> StunBindingClient.DualStackBindingResult =
             { target, resolverConfig, binding ->
-                StunBindingClient.probe(
+                StunBindingClient.probeDualStack(
                     host = target.host,
                     port = target.port,
                     resolverConfig = resolverConfig,
@@ -100,7 +102,7 @@ object CallTransportChecker {
                 observedPublicIp = proxyIp,
             )
         },
-        val proxyUdpStunProbe: suspend (Context, ProxyEndpoint, CallTransportTargetCatalog.CallTransportTarget, DnsResolverConfig) -> Result<StunBindingClient.BindingResult> =
+        val proxyUdpStunProbe: suspend (Context, ProxyEndpoint, CallTransportTargetCatalog.StunTarget, DnsResolverConfig) -> Result<StunBindingClient.BindingResult> =
             { context, proxyEndpoint, target, resolverConfig ->
                 probeProxyAssistedUdpStun(context, proxyEndpoint, target, resolverConfig)
             },
@@ -120,7 +122,6 @@ object CallTransportChecker {
         context: Context,
         resolverConfig: DnsResolverConfig,
         callTransportEnabled: Boolean,
-        experimentalCallTransportEnabled: Boolean = BuildConfig.DEBUG,
         onProgress: (suspend (String, String) -> Unit)? = null,
     ): Evaluation = withContext(Dispatchers.IO) {
         if (!callTransportEnabled) {
@@ -129,23 +130,29 @@ object CallTransportChecker {
         NativeCurlBridge.initIfNeeded(context)
 
         val dependencies = dependenciesOverride ?: Dependencies()
+
         val results = mutableListOf<CallTransportLeakResult>()
         results += probeDirect(
             context = context,
             resolverConfig = resolverConfig,
-            experimentalCallTransportEnabled = experimentalCallTransportEnabled,
             onProgress = onProgress,
         )
 
         val proxyEndpoint = cancellationAwareRunCatchingSuspend { dependencies.findLocalProxyEndpoint() }.getOrNull()
         if (proxyEndpoint?.type == ProxyType.SOCKS5) {
-            onProgress?.invoke(labelForService(CallTransportService.TELEGRAM), labelForPath(CallTransportNetworkPath.LOCAL_PROXY))
+            onProgress?.invoke("Telegram", labelForPath(CallTransportNetworkPath.LOCAL_PROXY))
             results += probeProxyAssistedTelegram(
                 context = context,
                 proxyEndpoint = proxyEndpoint,
                 resolverConfig = resolverConfig,
             )
         }
+
+        val stunGroups = probeStunTargets(
+            context = context,
+            resolverConfig = resolverConfig,
+            onProgress = onProgress,
+        )
 
         val deduplicated = deduplicate(results)
         val findings = mutableListOf<Finding>()
@@ -154,16 +161,64 @@ object CallTransportChecker {
 
         Evaluation(
             results = deduplicated,
+            stunGroups = stunGroups,
             findings = findings,
             evidence = evidence,
             needsReview = deduplicated.any { it.status == CallTransportStatus.NEEDS_REVIEW },
         )
     }
 
+    suspend fun probeStunTargets(
+        context: Context,
+        resolverConfig: DnsResolverConfig,
+        onProgress: (suspend (String, String) -> Unit)? = null,
+    ): List<StunProbeGroupResult> = withContext(Dispatchers.IO) {
+        val dependencies = dependenciesOverride ?: Dependencies()
+        val catalog = cancellationAwareRunCatching { dependencies.loadCatalog(context) }
+            .getOrElse { return@withContext emptyList() }
+
+        val paths = cancellationAwareRunCatching { dependencies.loadPaths(context) }
+            .getOrElse { return@withContext emptyList() }
+
+        val activePath = paths.firstOrNull { it.path == CallTransportNetworkPath.ACTIVE }
+            ?: return@withContext emptyList()
+
+        val binding = activePath.primaryBinding()
+
+        StunScope.entries.map { scope ->
+            val targets = catalog.stunTargets.filter { it.scope == scope }
+            onProgress?.invoke("STUN ${scope.name}", labelForPath(CallTransportNetworkPath.ACTIVE))
+            val probeResults = targets.map { target ->
+                val dual = cancellationAwareRunCatching {
+                    dependencies.stunDualStackProbe(target, resolverConfig, binding)
+                }.getOrElse {
+                    StunBindingClient.DualStackBindingResult(null, null)
+                }
+                StunProbeResult(
+                    host = target.host,
+                    port = target.port,
+                    scope = scope,
+                    mappedIpv4 = dual.ipv4Result?.getOrNull()?.mappedIp,
+                    mappedIpv6 = dual.ipv6Result?.getOrNull()?.mappedIp,
+                    error = when {
+                        dual.ipv4Result == null && dual.ipv6Result == null ->
+                            "Не удалось разрешить адрес"
+                        dual.ipv4Result?.isSuccess != true && dual.ipv6Result?.isSuccess != true -> {
+                            val err = dual.ipv4Result?.exceptionOrNull()
+                                ?: dual.ipv6Result?.exceptionOrNull()
+                            err?.message ?: "Нет ответа"
+                        }
+                        else -> null
+                    },
+                )
+            }
+            StunProbeGroupResult(scope = scope, results = probeResults)
+        }
+    }
+
     suspend fun probeDirect(
         context: Context,
         resolverConfig: DnsResolverConfig,
-        experimentalCallTransportEnabled: Boolean = BuildConfig.DEBUG,
         onProgress: (suspend (String, String) -> Unit)? = null,
     ): List<CallTransportLeakResult> = withContext(Dispatchers.IO) {
         val dependencies = dependenciesOverride ?: Dependencies()
@@ -171,43 +226,9 @@ object CallTransportChecker {
         val publicIpCache = mutableMapOf<PathDescriptor, Result<String>>()
 
         suspend fun fetchPublicIp(path: PathDescriptor): Result<String> {
-            val cached = publicIpCache[path]
-            if (cached != null) {
-                return cached
-            }
-            val value = dependencies.publicIpFetcher(path, resolverConfig)
-            publicIpCache[path] = value
-            return value
+            return publicIpCache.getOrPut(path) { dependencies.publicIpFetcher(path, resolverConfig) }
         }
 
-        val catalog = cancellationAwareRunCatching {
-            dependencies.loadCatalog(context, experimentalCallTransportEnabled)
-        }.getOrElse { error ->
-            return@withContext listOf(
-                errorResult(
-                    service = CallTransportService.TELEGRAM,
-                    probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                    path = CallTransportNetworkPath.ACTIVE,
-                    summary = "Telegram call transport target catalog is unavailable: ${error.message ?: error::class.java.simpleName}",
-                ),
-                if (experimentalCallTransportEnabled)
-                    errorResult(
-                        service = CallTransportService.WHATSAPP,
-                        probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                        path = CallTransportNetworkPath.ACTIVE,
-                        summary = "WhatsApp call transport target catalog is unavailable: ${error.message ?: error::class.java.simpleName}",
-                        experimental = true,
-                    )
-                else
-                    unsupportedResult(
-                        service = CallTransportService.WHATSAPP,
-                        probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                        path = CallTransportNetworkPath.ACTIVE,
-                        summary = "WhatsApp experimental trace is disabled in release builds",
-                        experimental = true,
-                    ),
-            )
-        }
         val paths = cancellationAwareRunCatching { dependencies.loadPaths(context) }
             .getOrElse { error ->
                 return@withContext listOf(
@@ -217,79 +238,11 @@ object CallTransportChecker {
                         path = CallTransportNetworkPath.ACTIVE,
                         summary = "Call transport network paths are unavailable: ${error.message ?: error::class.java.simpleName}",
                     ),
-                    if (experimentalCallTransportEnabled)
-                        errorResult(
-                            service = CallTransportService.WHATSAPP,
-                            probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                            path = CallTransportNetworkPath.ACTIVE,
-                            summary = "Call transport network paths are unavailable: ${error.message ?: error::class.java.simpleName}",
-                            experimental = true,
-                        )
-                    else
-                        unsupportedResult(
-                            service = CallTransportService.WHATSAPP,
-                            probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                            path = CallTransportNetworkPath.ACTIVE,
-                            summary = "WhatsApp experimental trace is disabled in release builds",
-                            experimental = true,
-                        ),
                 )
             }
 
-        if (catalog.telegramTargets.isEmpty()) {
-            results += unsupportedResult(
-                service = CallTransportService.TELEGRAM,
-                probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                path = CallTransportNetworkPath.ACTIVE,
-                summary = "Telegram call transport targets are unavailable",
-            )
-        } else {
-            for (path in paths) {
-                onProgress?.invoke(labelForService(CallTransportService.TELEGRAM), labelForPath(path.path))
-                results += probeServiceTargets(
-                    service = CallTransportService.TELEGRAM,
-                    targets = catalog.telegramTargets,
-                    path = path,
-                    fetchPublicIp = { fetchPublicIp(path) },
-                    stunProbe = { target ->
-                        probeStunWithFallback(dependencies, target, resolverConfig, path)
-                    },
-                )
-            }
-        }
-
-        if (experimentalCallTransportEnabled) {
-            if (catalog.whatsappTargets.isEmpty()) {
-                results += unsupportedResult(
-                    service = CallTransportService.WHATSAPP,
-                    probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                    path = CallTransportNetworkPath.ACTIVE,
-                    summary = "WhatsApp experimental call transport targets are unavailable",
-                    experimental = true,
-                )
-            } else {
-                for (path in paths) {
-                    onProgress?.invoke(labelForService(CallTransportService.WHATSAPP), labelForPath(path.path))
-                    results += probeServiceTargets(
-                        service = CallTransportService.WHATSAPP,
-                        targets = catalog.whatsappTargets,
-                        path = path,
-                        fetchPublicIp = { fetchPublicIp(path) },
-                        stunProbe = { target ->
-                            probeStunWithFallback(dependencies, target, resolverConfig, path)
-                        },
-                        experimental = true,
-                    )
-                }
-            }
-        } else {
-            results += unsupportedResult(
-                service = CallTransportService.WHATSAPP,
-                probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
-                path = CallTransportNetworkPath.ACTIVE,
-                summary = "WhatsApp experimental trace is disabled in release builds",
-                experimental = true,
-            )
+        for (path in paths) {
+            onProgress?.invoke("Telegram", labelForPath(path.path))
         }
 
         deduplicate(results)
@@ -345,20 +298,20 @@ object CallTransportChecker {
             )
         }
 
-        val telegramTargets = cancellationAwareRunCatching {
-            dependencies.loadCatalog(context, false).telegramTargets
-        }.getOrElse { error ->
-            return@withContext results + errorResult(
-                service = CallTransportService.TELEGRAM,
-                probeKind = CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN,
-                path = CallTransportNetworkPath.LOCAL_PROXY,
-                summary = "Telegram call transport target catalog is unavailable: ${error.message ?: error::class.java.simpleName}",
-            )
-        }
+        val catalog = cancellationAwareRunCatching { dependencies.loadCatalog(context) }
+            .getOrElse { error ->
+                return@withContext results + errorResult(
+                    service = CallTransportService.TELEGRAM,
+                    probeKind = CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN,
+                    path = CallTransportNetworkPath.LOCAL_PROXY,
+                    summary = "STUN target catalog is unavailable: ${error.message ?: error::class.java.simpleName}",
+                )
+            }
 
-        results += probeServiceTargets(
-            service = CallTransportService.TELEGRAM,
-            targets = telegramTargets,
+        val stunTargets = catalog.stunTargets
+
+        results += probeStunServiceTargets(
+            targets = stunTargets,
             path = PathDescriptor(path = CallTransportNetworkPath.LOCAL_PROXY),
             fetchPublicIp = {
                 fetchProxyPublicIp()?.let { Result.success(it) }
@@ -373,22 +326,20 @@ object CallTransportChecker {
         deduplicate(results)
     }
 
-    private suspend fun probeServiceTargets(
-        service: CallTransportService,
-        targets: List<CallTransportTargetCatalog.CallTransportTarget>,
+    private suspend fun probeStunServiceTargets(
+        targets: List<CallTransportTargetCatalog.StunTarget>,
         path: PathDescriptor,
         fetchPublicIp: suspend () -> Result<String>,
-        stunProbe: suspend (CallTransportTargetCatalog.CallTransportTarget) -> Result<StunBindingClient.BindingResult>,
-        experimental: Boolean = false,
+        stunProbe: suspend (CallTransportTargetCatalog.StunTarget) -> Result<StunBindingClient.BindingResult>,
         probeKind: CallTransportProbeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
     ): CallTransportLeakResult {
         if (targets.isEmpty()) {
-            return unsupportedResult(
-                service = service,
+            return CallTransportLeakResult(
+                service = CallTransportService.TELEGRAM,
                 probeKind = probeKind,
-                path = path.path,
-                summary = "${labelForService(service)} call transport targets are unavailable",
-                experimental = experimental,
+                networkPath = path.path,
+                status = CallTransportStatus.UNSUPPORTED,
+                summary = "STUN targets are unavailable",
             )
         }
 
@@ -398,28 +349,22 @@ object CallTransportChecker {
             if (binding.isSuccess) {
                 val result = binding.getOrThrow()
                 val publicIp = fetchPublicIp().getOrNull()
-                val status = classifySignal(
-                    path = path,
-                    mappedIp = result.mappedIp,
-                    publicIp = publicIp,
-                )
+                val status = classifySignal(path = path, mappedIp = result.mappedIp, publicIp = publicIp)
                 val confidence = when {
                     publicIp != null && publicIp != result.mappedIp -> EvidenceConfidence.HIGH
                     publicIp != null -> EvidenceConfidence.MEDIUM
                     else -> EvidenceConfidence.LOW
                 }
                 return CallTransportLeakResult(
-                    service = service,
+                    service = CallTransportService.TELEGRAM,
                     probeKind = probeKind,
                     networkPath = path.path,
                     status = status,
                     targetHost = target.host,
                     targetPort = target.port,
-                    resolvedIps = result.resolvedIps,
                     mappedIp = result.mappedIp,
                     observedPublicIp = publicIp,
                     summary = buildDirectSummary(
-                        service = service,
                         path = path.path,
                         targetHost = target.host,
                         targetPort = target.port,
@@ -427,44 +372,20 @@ object CallTransportChecker {
                         publicIp = publicIp,
                     ),
                     confidence = confidence,
-                    experimental = experimental,
                 )
             }
             lastError = binding.exceptionOrNull()
         }
 
         return CallTransportLeakResult(
-            service = service,
+            service = CallTransportService.TELEGRAM,
             probeKind = probeKind,
             networkPath = path.path,
             status = CallTransportStatus.NO_SIGNAL,
             targetHost = targets.firstOrNull()?.host,
             targetPort = targets.firstOrNull()?.port,
-            summary = buildNoSignalSummary(
-                service = service,
-                path = path.path,
-                probeKind = probeKind,
-                lastError = lastError,
-            ),
-            experimental = experimental,
+            summary = buildNoSignalSummary(path = path.path, probeKind = probeKind, lastError = lastError),
         )
-    }
-
-    private suspend fun probeStunWithFallback(
-        dependencies: Dependencies,
-        target: CallTransportTargetCatalog.CallTransportTarget,
-        resolverConfig: DnsResolverConfig,
-        path: PathDescriptor,
-    ): Result<StunBindingClient.BindingResult> {
-        var lastError: Throwable? = null
-        for (binding in path.stunBindings()) {
-            val result = dependencies.stunProbe(target, resolverConfig, binding)
-            if (result.isSuccess) {
-                return result
-            }
-            lastError = result.exceptionOrNull() ?: lastError
-        }
-        return Result.failure(lastError ?: IllegalStateException("Call transport STUN probe failed"))
     }
 
     private fun classifySignal(
@@ -491,12 +412,11 @@ object CallTransportChecker {
 
     private fun sameIpFamily(first: String, second: String): Boolean {
         return cancellationAwareRunCatching {
-            InetAddress.getByName(first)::class.java == InetAddress.getByName(second)::class.java
+            java.net.InetAddress.getByName(first)::class.java == java.net.InetAddress.getByName(second)::class.java
         }.getOrDefault(false)
     }
 
     private fun buildDirectSummary(
-        service: CallTransportService,
         path: CallTransportNetworkPath,
         targetHost: String,
         targetPort: Int,
@@ -504,16 +424,12 @@ object CallTransportChecker {
         publicIp: String?,
     ): String {
         val target = formatHostPort(targetHost, targetPort)
-        val base = "${labelForService(service)} call transport via ${labelForPath(path)}: STUN endpoint $target responded"
-        return if (publicIp.isNullOrBlank()) {
-            "$base (mapped IP: $mappedIp)"
-        } else {
-            "$base (mapped IP: $mappedIp, public IP: $publicIp)"
-        }
+        val base = "STUN via ${labelForPath(path)}: endpoint $target responded"
+        return if (publicIp.isNullOrBlank()) "$base (mapped IP: $mappedIp)"
+        else "$base (mapped IP: $mappedIp, public IP: $publicIp)"
     }
 
     private fun buildNoSignalSummary(
-        service: CallTransportService,
         path: CallTransportNetworkPath,
         probeKind: CallTransportProbeKind,
         lastError: Throwable?,
@@ -521,10 +437,10 @@ object CallTransportChecker {
         val suffix = lastError?.message?.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
         return when (probeKind) {
             CallTransportProbeKind.PROXY_ASSISTED_TELEGRAM ->
-                "${labelForService(service)} call transport via ${labelForPath(path)} did not expose a reachable Telegram DC$suffix"
+                "Telegram call transport via ${labelForPath(path)} did not expose a reachable Telegram DC$suffix"
             CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN,
             CallTransportProbeKind.DIRECT_UDP_STUN,
-            -> "${labelForService(service)} call transport via ${labelForPath(path)} did not receive a STUN response$suffix"
+            -> "STUN via ${labelForPath(path)} did not receive a response$suffix"
         }
     }
 
@@ -535,11 +451,10 @@ object CallTransportChecker {
         publicIp: String?,
     ): String {
         val proxyLabel = formatHostPort(proxyEndpoint.host, proxyEndpoint.port)
-        val targetLabel = if (!targetHost.isNullOrBlank() && targetPort != null) {
+        val targetLabel = if (!targetHost.isNullOrBlank() && targetPort != null)
             formatHostPort(targetHost, targetPort)
-        } else {
+        else
             "Telegram DC"
-        }
         val base = "Telegram call transport via local SOCKS5 proxy $proxyLabel: $targetLabel is reachable"
         return if (publicIp.isNullOrBlank()) base else "$base (public IP: $publicIp)"
     }
@@ -547,7 +462,7 @@ object CallTransportChecker {
     private suspend fun probeProxyAssistedUdpStun(
         context: Context,
         proxyEndpoint: ProxyEndpoint,
-        target: CallTransportTargetCatalog.CallTransportTarget,
+        target: CallTransportTargetCatalog.StunTarget,
         resolverConfig: DnsResolverConfig,
     ): Result<StunBindingClient.BindingResult> = withContext(Dispatchers.IO) {
         val resolvedIps = cancellationAwareRunCatching {
@@ -595,7 +510,7 @@ object CallTransportChecker {
 
     private fun probeProxyUdpSession(
         session: Socks5UdpAssociateClient.Session,
-        target: CallTransportTargetCatalog.CallTransportTarget,
+        target: CallTransportTargetCatalog.StunTarget,
         resolvedIps: List<String>,
     ): StunBindingClient.BindingResult {
         val executionContext = com.notcvnt.rknhardering.ScanExecutionContext.currentOrDefault()
@@ -725,11 +640,11 @@ object CallTransportChecker {
                     findings += Finding(
                         description = result.summary,
                         needsReview = true,
-                        source = result.service.toEvidenceSource(),
+                        source = EvidenceSource.TELEGRAM_CALL_TRANSPORT,
                         confidence = result.confidence ?: EvidenceConfidence.MEDIUM,
                     )
                     evidence += EvidenceItem(
-                        source = result.service.toEvidenceSource(),
+                        source = EvidenceSource.TELEGRAM_CALL_TRANSPORT,
                         detected = true,
                         confidence = result.confidence ?: EvidenceConfidence.MEDIUM,
                         description = result.summary,
@@ -740,7 +655,7 @@ object CallTransportChecker {
                     findings += Finding(
                         description = result.summary,
                         isError = true,
-                        source = result.service.toEvidenceSource(),
+                        source = EvidenceSource.TELEGRAM_CALL_TRANSPORT,
                         confidence = result.confidence,
                     )
                 }
@@ -757,7 +672,6 @@ object CallTransportChecker {
         probeKind: CallTransportProbeKind,
         path: CallTransportNetworkPath,
         summary: String,
-        experimental: Boolean = false,
     ): CallTransportLeakResult {
         return CallTransportLeakResult(
             service = service,
@@ -766,32 +680,7 @@ object CallTransportChecker {
             status = CallTransportStatus.ERROR,
             summary = summary,
             confidence = EvidenceConfidence.LOW,
-            experimental = experimental,
         )
-    }
-
-    private fun unsupportedResult(
-        service: CallTransportService,
-        probeKind: CallTransportProbeKind,
-        path: CallTransportNetworkPath,
-        summary: String,
-        experimental: Boolean = false,
-    ): CallTransportLeakResult {
-        return CallTransportLeakResult(
-            service = service,
-            probeKind = probeKind,
-            networkPath = path,
-            status = CallTransportStatus.UNSUPPORTED,
-            summary = summary,
-            experimental = experimental,
-        )
-    }
-
-    private fun labelForService(service: CallTransportService): String {
-        return when (service) {
-            CallTransportService.TELEGRAM -> "Telegram"
-            CallTransportService.WHATSAPP -> "WhatsApp"
-        }
     }
 
     private fun labelForPath(path: CallTransportNetworkPath): String {
@@ -808,15 +697,6 @@ object CallTransportChecker {
 
     private fun PathDescriptor.primaryBinding(): ResolverBinding? {
         return network?.let(ResolverBinding::AndroidNetworkBinding)
-    }
-
-    private fun PathDescriptor.stunBindings(): List<ResolverBinding?> {
-        val bindings = mutableListOf<ResolverBinding?>(primaryBinding())
-        val fallbackBinding = fallbackBinding()
-        if (fallbackBinding != null && fallbackBinding !in bindings) {
-            bindings += fallbackBinding
-        }
-        return bindings
     }
 
     private fun PathDescriptor.fallbackBinding(): ResolverBinding.OsDeviceBinding? {
@@ -856,12 +736,5 @@ object CallTransportChecker {
             )
         }
         return paths
-    }
-
-    private fun CallTransportService.toEvidenceSource(): EvidenceSource {
-        return when (this) {
-            CallTransportService.TELEGRAM -> EvidenceSource.TELEGRAM_CALL_TRANSPORT
-            CallTransportService.WHATSAPP -> EvidenceSource.WHATSAPP_CALL_TRANSPORT
-        }
     }
 }

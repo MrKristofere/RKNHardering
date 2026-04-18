@@ -60,8 +60,8 @@
     <string name="settings_cdn_pulling_warning_confirm">启用</string>
     <string name="settings_cdn_pulling_meduza">包含 meduza.io</string>
     <string name="settings_cdn_pulling_meduza_desc">在 CDN pulling 过程中向 meduza.io/cdn-cgi/trace 发送请求。</string>
-    <string name="settings_call_transport_probe">Call transport 泄露探测</string>
-    <string name="settings_call_transport_probe_desc">会向内置的 Telegram 目标发送额外的 UDP/STUN 请求。WhatsApp 跟踪仅在 debug 或 experimental 构建中运行。</string>
+    <string name="settings_call_transport_probe">Call transport 与 STUN 探测</string>
+    <string name="settings_call_transport_probe_desc">向公共 STUN 服务器（全球和俄罗斯）发送 UDP/STUN 请求，并检查本地 SOCKS5 代理的 Telegram MTProto 流量。</string>
     <string name="settings_dns_resolver">DNS resolver</string>
     <string name="settings_dns_resolver_desc">用于 GeoIP、IP Comparison 和 BeaconDB。它不会修改 Android 系统 DNS，也不会影响本地 DNS 检查。</string>
     <string name="settings_dns_mode_system">系统</string>
@@ -114,7 +114,7 @@
     <string name="main_card_cdn_pulling">CDN pulling</string>
     <string name="main_card_direct_signs">直接迹象</string>
     <string name="main_card_indirect_signs">间接迹象</string>
-    <string name="main_card_call_transport">STUN 服务器</string>
+    <string name="main_card_call_transport">STUN mapped IP</string>
     <string name="main_card_call_transport_status_no_signal">无信号</string>
     <string name="main_card_call_transport_status_needs_review">需要检查</string>
     <string name="main_card_call_transport_status_unsupported">不支持</string>
@@ -126,8 +126,15 @@
     <string name="main_card_call_transport_header">%1$s · %2$s · %3$s</string>
     <string name="main_card_call_transport_reason_no_response">未收到 STUN 响应</string>
     <string name="main_card_call_transport_reason_telegram_dc_unreachable">无法通过本地 SOCKS5 代理访问 Telegram DC</string>
-    <string name="main_card_call_transport_reason_release_only">WhatsApp 跟踪仅在 debug 或 experimental 构建中可用</string>
     <string name="main_card_call_transport_reason_targets_unavailable">此检查的目标不可用</string>
+    <string name="main_card_call_transport_stun_group_global">全球 STUN</string>
+    <string name="main_card_call_transport_stun_group_ru">俄罗斯 STUN</string>
+    <string name="main_card_call_transport_stun_responded">%1$d / %2$d 已响应</string>
+    <string name="main_card_call_transport_stun_none_responded">无响应</string>
+    <string name="main_card_call_transport_stun_ipv4">IPv4</string>
+    <string name="main_card_call_transport_stun_ipv6">IPv6</string>
+    <string name="main_card_call_transport_stun_no_response">无响应</string>
+    <string name="main_card_call_transport_stun_error">错误</string>
     <string name="main_card_location_signals">位置迹象</string>
     <string name="main_verdict_details">详情</string>
 

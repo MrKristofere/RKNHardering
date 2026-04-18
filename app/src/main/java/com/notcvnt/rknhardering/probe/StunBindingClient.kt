@@ -17,6 +17,11 @@ import kotlin.random.Random
 
 object StunBindingClient {
 
+    data class DualStackBindingResult(
+        val ipv4Result: Result<BindingResult>?,
+        val ipv6Result: Result<BindingResult>?,
+    )
+
     data class BindingResult(
         val resolvedIps: List<String>,
         val remoteIp: String,
@@ -71,6 +76,57 @@ object StunBindingClient {
             }
             throw lastError ?: IOException("No STUN response from $host:$port")
         }
+    }
+
+    fun probeDualStack(
+        host: String,
+        port: Int,
+        resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        binding: ResolverBinding? = null,
+        timeoutMs: Int = 3_000,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): DualStackBindingResult {
+        executionContext.throwIfCancelled()
+        val allAddresses = runCatching {
+            ResolverNetworkStack.lookup(
+                hostname = host,
+                config = resolverConfig,
+                binding = binding,
+                cancellationSignal = executionContext.cancellationSignal,
+            ).distinctBy { it.hostAddress }
+        }.getOrElse { return DualStackBindingResult(null, null) }
+
+        val ipv4Addresses = allAddresses.filterIsInstance<Inet4Address>()
+        val ipv6Addresses = allAddresses.filterIsInstance<Inet6Address>()
+
+        fun probeFamily(addresses: List<InetAddress>): Result<BindingResult>? {
+            if (addresses.isEmpty()) return null
+            var lastError: Exception? = null
+            for (address in addresses) {
+                try {
+                    return Result.success(
+                        sendBindingRequest(
+                            host = host,
+                            port = port,
+                            address = address,
+                            resolvedAddresses = allAddresses,
+                            binding = binding,
+                            timeoutMs = timeoutMs,
+                            executionContext = executionContext,
+                        )
+                    )
+                } catch (error: Exception) {
+                    rethrowIfCancellation(error, executionContext)
+                    lastError = error
+                }
+            }
+            return Result.failure(lastError ?: IOException("No STUN response from $host:$port"))
+        }
+
+        return DualStackBindingResult(
+            ipv4Result = probeFamily(ipv4Addresses),
+            ipv6Result = probeFamily(ipv6Addresses),
+        )
     }
 
     internal fun probeWithDatagramExchange(

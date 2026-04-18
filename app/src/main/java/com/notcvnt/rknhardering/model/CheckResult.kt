@@ -32,6 +32,38 @@ enum class EvidenceSource {
     TUN_ACTIVE_PROBE,
     TELEGRAM_CALL_TRANSPORT,
     WHATSAPP_CALL_TRANSPORT,
+    STUN_PROBE,
+}
+
+enum class StunScope {
+    RU,
+    GLOBAL,
+}
+
+data class StunProbeResult(
+    val host: String,
+    val port: Int,
+    val scope: StunScope,
+    val mappedIpv4: String? = null,
+    val mappedIpv6: String? = null,
+    val error: String? = null,
+) {
+    val hasResponse: Boolean get() = mappedIpv4 != null || mappedIpv6 != null
+    val mappedIpDisplay: String?
+        get() = when {
+            mappedIpv4 != null && mappedIpv6 != null -> "$mappedIpv4 / $mappedIpv6"
+            mappedIpv4 != null -> mappedIpv4
+            mappedIpv6 != null -> mappedIpv6
+            else -> null
+        }
+}
+
+data class StunProbeGroupResult(
+    val scope: StunScope,
+    val results: List<StunProbeResult>,
+) {
+    val respondedCount: Int get() = results.count { it.hasResponse }
+    val totalCount: Int get() = results.size
 }
 
 enum class CallTransportService {
@@ -166,6 +198,7 @@ data class CategoryResult(
     val matchedApps: List<MatchedVpnApp> = emptyList(),
     val activeApps: List<ActiveVpnApp> = emptyList(),
     val callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
+    val stunProbeGroups: List<StunProbeGroupResult> = emptyList(),
 ) {
     val hasError: Boolean
         get() = findings.any { it.isError }

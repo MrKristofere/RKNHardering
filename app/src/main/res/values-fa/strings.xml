@@ -60,8 +60,8 @@
     <string name="settings_cdn_pulling_warning_confirm">فعال کردن</string>
     <string name="settings_cdn_pulling_meduza">meduza.io را شامل کن</string>
     <string name="settings_cdn_pulling_meduza_desc">یک درخواست به meduza.io/cdn-cgi/trace به عنوان بخشی از CDN pulling ارسال کنید.</string>
-    <string name="settings_call_transport_probe">نشت‌های call transport</string>
-    <string name="settings_call_transport_probe_desc">درخواست‌های اضافی UDP/STUN به هدف‌های داخلی Telegram می‌فرستد. ردیابی WhatsApp فقط در buildهای debug یا experimental اجرا می‌شود.</string>
+    <string name="settings_call_transport_probe">Call transport و بررسی STUN</string>
+    <string name="settings_call_transport_probe_desc">درخواست‌های UDP/STUN به سرورهای STUN عمومی (جهانی و روسی) می‌فرستد و پروکسی SOCKS5 محلی را برای ترافیک Telegram MTProto بررسی می‌کند.</string>
     <string name="settings_dns_resolver">DNS resolver</string>
     <string name="settings_dns_resolver_desc">برای GeoIP، IP Comparison و BeaconDB استفاده می‌شود. DNS سیستمی Android را تغییر نمی‌دهد و روی بررسی‌های محلی DNS اثری ندارد.</string>
     <string name="settings_dns_mode_system">سیستمی</string>
@@ -114,7 +114,7 @@
     <string name="main_card_cdn_pulling">CDN pulling</string>
     <string name="main_card_direct_signs">نشانه‌های مستقیم</string>
     <string name="main_card_indirect_signs">نشانه‌های غیرمستقیم</string>
-    <string name="main_card_call_transport">سرورهای STUN</string>
+    <string name="main_card_call_transport">STUN mapped IP</string>
     <string name="main_card_call_transport_status_no_signal">بدون سیگنال</string>
     <string name="main_card_call_transport_status_needs_review">نیاز به بررسی</string>
     <string name="main_card_call_transport_status_unsupported">پشتیبانی نمی‌شود</string>
@@ -126,8 +126,15 @@
     <string name="main_card_call_transport_header">%1$s · %2$s · %3$s</string>
     <string name="main_card_call_transport_reason_no_response">هیچ پاسخی از STUN دریافت نشد</string>
     <string name="main_card_call_transport_reason_telegram_dc_unreachable">Telegram DC از طریق پروکسی SOCKS5 محلی قابل دسترس نیست</string>
-    <string name="main_card_call_transport_reason_release_only">ردیابی WhatsApp فقط در بیلدهای debug یا experimental در دسترس است</string>
     <string name="main_card_call_transport_reason_targets_unavailable">اهداف این بررسی در دسترس نیستند</string>
+    <string name="main_card_call_transport_stun_group_global">STUN جهانی</string>
+    <string name="main_card_call_transport_stun_group_ru">STUN روسی</string>
+    <string name="main_card_call_transport_stun_responded">%1$d از %2$d پاسخ داد</string>
+    <string name="main_card_call_transport_stun_none_responded">بدون پاسخ</string>
+    <string name="main_card_call_transport_stun_ipv4">IPv4</string>
+    <string name="main_card_call_transport_stun_ipv6">IPv6</string>
+    <string name="main_card_call_transport_stun_no_response">بدون پاسخ</string>
+    <string name="main_card_call_transport_stun_error">خطا</string>
     <string name="main_card_location_signals">نشانه‌های مکان</string>
     <string name="main_verdict_details">جزئیات</string>
 

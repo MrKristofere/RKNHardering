@@ -55,6 +55,8 @@ import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpComparisonResult
+import com.notcvnt.rknhardering.model.StunProbeGroupResult
+import com.notcvnt.rknhardering.model.StunScope
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import kotlinx.coroutines.Job
@@ -142,8 +144,6 @@ internal fun formatCallTransportReason(
                 detail = summaryDetailAfterMarker(summary, CALL_TRANSPORT_TELEGRAM_DC_UNREACHABLE_MARKER),
                 privacyMode = privacyMode,
             )
-        summary.contains("experimental trace is disabled in release builds", ignoreCase = true) ->
-            context.getString(R.string.main_card_call_transport_reason_release_only)
         summary.contains("targets are unavailable", ignoreCase = true) ||
             summary.contains("target catalog is unavailable", ignoreCase = true) ->
             context.getString(R.string.main_card_call_transport_reason_targets_unavailable)
@@ -214,6 +214,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardCallTransport: MaterialCardView
     private lateinit var iconCallTransport: ImageView
     private lateinit var statusCallTransport: TextView
+    private lateinit var textCallTransportSummary: TextView
+    private lateinit var stunGroupsContainer: LinearLayout
     private lateinit var findingsCallTransport: LinearLayout
     private lateinit var cardVerdict: MaterialCardView
     private lateinit var iconGeoIp: ImageView
@@ -385,6 +387,8 @@ class MainActivity : AppCompatActivity() {
         cardCallTransport = findViewById(R.id.cardCallTransport)
         iconCallTransport = findViewById(R.id.iconCallTransport)
         statusCallTransport = findViewById(R.id.statusCallTransport)
+        textCallTransportSummary = findViewById(R.id.textCallTransportSummary)
+        stunGroupsContainer = findViewById(R.id.stunGroupsContainer)
         findingsCallTransport = findViewById(R.id.findingsCallTransport)
         cardVerdict = findViewById(R.id.cardVerdict)
         iconGeoIp = findViewById(R.id.iconGeoIp)
@@ -1101,9 +1105,9 @@ class MainActivity : AppCompatActivity() {
                     SettingsActivity.PREF_CALL_TRANSPORT_PROBE_ENABLED, false,
                 )
                 if (callTransportEnabled) {
-                    displayCallTransport(update.result.callTransportLeaks, activeCheckPrivacyMode)
-                    updateTileFromCallTransport(update.result.callTransportLeaks)
-                    if (animate) animateContentReveal(findingsCallTransport)
+                    displayCallTransport(update.result.callTransportLeaks, update.result.stunProbeGroups, activeCheckPrivacyMode)
+                    updateTileFromCallTransport(update.result.callTransportLeaks, update.result.stunProbeGroups)
+                    if (animate) animateContentReveal(findingsCallTransport, stunGroupsContainer)
                 }
             }
             is CheckUpdate.LocationSignalsReady -> {
@@ -2002,8 +2006,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun displayCallTransport(leaks: List<CallTransportLeakResult>, privacyMode: Boolean) {
-        if (leaks.isEmpty()) {
+    private fun displayCallTransport(
+        leaks: List<CallTransportLeakResult>,
+        stunGroups: List<StunProbeGroupResult>,
+        privacyMode: Boolean,
+    ) {
+        val hasContent = leaks.isNotEmpty() || stunGroups.any { it.results.isNotEmpty() }
+        if (!hasContent) {
             cardCallTransport.visibility = View.GONE
             return
         }
@@ -2019,11 +2028,201 @@ class MainActivity : AppCompatActivity() {
             hasError = hasError && !hasNeedsReview,
         )
 
-        findingsCallTransport.removeAllViews()
-        findingsCallTransport.visibility = View.VISIBLE
-        for (leak in leaks) {
-            findingsCallTransport.addView(createCallTransportLeakView(leak, privacyMode))
+        val respondedCount = stunGroups.sumOf { it.respondedCount }
+        val totalCount = stunGroups.sumOf { it.totalCount }
+        if (totalCount > 0) {
+            textCallTransportSummary.text = getString(
+                R.string.main_card_call_transport_stun_responded,
+                respondedCount,
+                totalCount,
+            )
+            textCallTransportSummary.visibility = View.VISIBLE
+        } else {
+            textCallTransportSummary.visibility = View.GONE
         }
+
+        stunGroupsContainer.removeAllViews()
+        if (stunGroups.isNotEmpty()) {
+            stunGroupsContainer.visibility = View.VISIBLE
+            for (group in stunGroups) {
+                stunGroupsContainer.addView(createStunGroupView(group, privacyMode))
+            }
+        } else {
+            stunGroupsContainer.visibility = View.GONE
+        }
+
+        findingsCallTransport.removeAllViews()
+        if (leaks.isNotEmpty()) {
+            findingsCallTransport.visibility = View.VISIBLE
+            for (leak in leaks) {
+                findingsCallTransport.addView(createCallTransportLeakView(leak, privacyMode))
+            }
+        } else {
+            findingsCallTransport.visibility = View.GONE
+        }
+    }
+
+    private fun createStunGroupView(group: StunProbeGroupResult, privacyMode: Boolean): View {
+        val groupTitle = when (group.scope) {
+            StunScope.GLOBAL -> getString(R.string.main_card_call_transport_stun_group_global)
+            StunScope.RU -> getString(R.string.main_card_call_transport_stun_group_ru)
+        }
+        val respondedCount = group.respondedCount
+        val totalCount = group.totalCount
+        val statusLabel = if (respondedCount > 0) {
+            getString(R.string.main_card_call_transport_stun_responded, respondedCount, totalCount)
+        } else {
+            getString(R.string.main_card_call_transport_stun_none_responded)
+        }
+        val groupResult = com.notcvnt.rknhardering.model.IpCheckerGroupResult(
+            title = groupTitle,
+            detected = false,
+            needsReview = false,
+            statusLabel = statusLabel,
+            summary = statusLabel,
+            responses = emptyList(),
+        )
+
+        val card = com.google.android.material.card.MaterialCardView(themedContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 8.dp }
+            radius = 14.dp.toFloat()
+            strokeWidth = 1.dp
+            strokeColor = outlineVariantColor()
+            setCardBackgroundColor(surfaceColor())
+        }
+
+        val container = LinearLayout(themedContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(12.dp, 12.dp, 12.dp, 12.dp)
+        }
+
+        val header = LinearLayout(themedContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val title = TextView(themedContext()).apply {
+            text = groupTitle
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(onSurfaceColor())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val statusView = TextView(themedContext()).apply {
+            text = statusLabel
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(
+                ContextCompat.getColor(
+                    themedContext(),
+                    if (respondedCount > 0) R.color.status_green else R.color.status_amber,
+                ),
+            )
+        }
+
+        val expanded = respondedCount > 0
+        val toggle = TextView(themedContext()).apply {
+            text = if (expanded) "▼" else "▶"
+            textSize = 12f
+            setPadding(8.dp, 0, 0, 0)
+            setTextColor(onSurfaceVariantColor())
+        }
+
+        val details = LinearLayout(themedContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = if (expanded) View.VISIBLE else View.GONE
+            setPadding(0, 8.dp, 0, 0)
+        }
+
+        for (result in group.results) {
+            details.addView(createStunProbeResultView(result, privacyMode))
+        }
+
+        val toggleDetails = {
+            val nextExpanded = details.visibility != View.VISIBLE
+            details.visibility = if (nextExpanded) View.VISIBLE else View.GONE
+            toggle.text = if (nextExpanded) "▼" else "▶"
+        }
+        header.setOnClickListener { toggleDetails() }
+
+        header.addView(title)
+        header.addView(statusView)
+        header.addView(toggle)
+        container.addView(header)
+        container.addView(details)
+        card.addView(container)
+        return card
+    }
+
+    private fun createStunProbeResultView(result: com.notcvnt.rknhardering.model.StunProbeResult, privacyMode: Boolean): View {
+        val container = LinearLayout(themedContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 6.dp, 0, 6.dp)
+        }
+
+        val hostRow = LinearLayout(themedContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val hostLabel = TextView(themedContext()).apply {
+            text = "${result.host}:${result.port}"
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(onSurfaceColor())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val hasAnyResponse = result.hasResponse
+        val hasDualStack = result.mappedIpv4 != null && result.mappedIpv6 != null
+        val responseLabel = TextView(themedContext()).apply {
+            text = when {
+                hasAnyResponse && hasDualStack -> "IPv4 + IPv6"
+                hasAnyResponse -> result.mappedIpDisplay?.let { ip ->
+                    if (privacyMode) maskIp(ip) else ip
+                } ?: getString(R.string.main_card_call_transport_stun_no_response)
+                result.error != null -> getString(R.string.main_card_call_transport_stun_error)
+                else -> getString(R.string.main_card_call_transport_stun_no_response)
+            }
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setTextColor(
+                ContextCompat.getColor(
+                    themedContext(),
+                    if (hasAnyResponse) R.color.status_green else R.color.status_amber,
+                ),
+            )
+        }
+
+        hostRow.addView(hostLabel)
+        hostRow.addView(responseLabel)
+        container.addView(hostRow)
+
+        if (result.mappedIpv4 != null && result.mappedIpv6 != null) {
+            container.addView(createInfoView(
+                getString(R.string.main_card_call_transport_stun_ipv4),
+                if (privacyMode) maskIp(result.mappedIpv4) else result.mappedIpv4,
+            ))
+            container.addView(createInfoView(
+                getString(R.string.main_card_call_transport_stun_ipv6),
+                if (privacyMode) maskIp(result.mappedIpv6) else result.mappedIpv6,
+            ))
+        }
+
+        result.error?.takeIf { it.isNotBlank() && !hasAnyResponse }?.let { err ->
+            container.addView(TextView(themedContext()).apply {
+                text = err
+                textSize = 11f
+                setTextColor(onSurfaceVariantColor())
+                setPadding(0, 2.dp, 0, 0)
+            })
+        }
+
+        return container
     }
 
     private fun createCallTransportLeakView(leak: CallTransportLeakResult, privacyMode: Boolean): View {
@@ -2560,19 +2759,24 @@ class MainActivity : AppCompatActivity() {
         setTileStatus(CATEGORY_BYP, status, hint)
     }
 
-    private fun updateTileFromCallTransport(leaks: List<CallTransportLeakResult>) {
-        if (leaks.isEmpty()) {
+    private fun updateTileFromCallTransport(leaks: List<CallTransportLeakResult>, stunGroups: List<StunProbeGroupResult>) {
+        val respondedCount = stunGroups.sumOf { it.respondedCount }
+        val totalCount = stunGroups.sumOf { it.totalCount }
+        val hasNeedsReview = leaks.any { it.status == CallTransportStatus.NEEDS_REVIEW }
+        val hasError = leaks.any { it.status == CallTransportStatus.ERROR }
+        if (leaks.isEmpty() && totalCount == 0) {
             setTileStatus(CATEGORY_STN, TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_placeholder))
             return
         }
-        val hasNeedsReview = leaks.any { it.status == CallTransportStatus.NEEDS_REVIEW }
-        val hasError = leaks.any { it.status == CallTransportStatus.ERROR }
         val status = when {
             hasNeedsReview -> TILE_STATUS_REVIEW
             hasError -> TILE_STATUS_REVIEW
             else -> TILE_STATUS_CLEAN
         }
-        val hint = getString(R.string.tile_hint_clean_count, leaks.size)
+        val hint = if (totalCount > 0)
+            getString(R.string.main_card_call_transport_stun_responded, respondedCount, totalCount)
+        else
+            getString(R.string.tile_hint_clean_count, leaks.size)
         setTileStatus(CATEGORY_STN, status, hint)
     }
 

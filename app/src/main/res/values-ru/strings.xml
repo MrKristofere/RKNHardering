@@ -60,8 +60,8 @@
     <string name="settings_cdn_pulling_warning_confirm">Включить</string>
     <string name="settings_cdn_pulling_meduza">Включить meduza.io</string>
     <string name="settings_cdn_pulling_meduza_desc">Отправлять запрос на meduza.io/cdn-cgi/trace в рамках CDN pulling.</string>
-    <string name="settings_call_transport_probe">Утечки call transport</string>
-    <string name="settings_call_transport_probe_desc">Отправляет дополнительные UDP/STUN-запросы к встроенным Telegram-целям. Трассировка WhatsApp работает только в debug или experimental сборках.</string>
+    <string name="settings_call_transport_probe">Call transport и STUN-проверка</string>
+    <string name="settings_call_transport_probe_desc">Отправляет UDP/STUN-запросы к публичным STUN-серверам (глобальным и российским) и проверяет локальный SOCKS5-прокси на наличие трафика Telegram MTProto.</string>
     <string name="settings_dns_resolver">DNS-резолвер</string>
     <string name="settings_dns_resolver_desc">Применяется к GeoIP, IP Comparison и BeaconDB. Не меняет системный DNS Android и не влияет на локальные DNS-проверки.</string>
     <string name="settings_dns_mode_system">Системный</string>
@@ -114,7 +114,7 @@
     <string name="main_card_cdn_pulling">CDN pulling</string>
     <string name="main_card_direct_signs">Прямые признаки</string>
     <string name="main_card_indirect_signs">Косвенные признаки</string>
-    <string name="main_card_call_transport">STUN-серверы</string>
+    <string name="main_card_call_transport">STUN mapped IP</string>
     <string name="main_card_call_transport_status_baseline">Ответ есть</string>
     <string name="main_card_call_transport_status_no_signal">Нет ответа</string>
     <string name="main_card_call_transport_status_needs_review">Требует проверки</string>
@@ -126,8 +126,15 @@
     <string name="main_card_call_transport_header">%1$s · %2$s · %3$s</string>
     <string name="main_card_call_transport_reason_no_response">STUN-ответ не получен</string>
     <string name="main_card_call_transport_reason_telegram_dc_unreachable">Telegram DC недостижим через локальный SOCKS5-прокси</string>
-    <string name="main_card_call_transport_reason_release_only">Трассировка WhatsApp доступна только в debug или experimental сборке</string>
     <string name="main_card_call_transport_reason_targets_unavailable">Цели для этой проверки недоступны</string>
+    <string name="main_card_call_transport_stun_group_global">Глобальный STUN</string>
+    <string name="main_card_call_transport_stun_group_ru">STUN (RU)</string>
+    <string name="main_card_call_transport_stun_responded">%1$d из %2$d ответили</string>
+    <string name="main_card_call_transport_stun_none_responded">Нет ответа</string>
+    <string name="main_card_call_transport_stun_ipv4">IPv4</string>
+    <string name="main_card_call_transport_stun_ipv6">IPv6</string>
+    <string name="main_card_call_transport_stun_no_response">Нет ответа</string>
+    <string name="main_card_call_transport_stun_error">Ошибка</string>
     <string name="main_card_location_signals">Сигналы местоположения</string>
     <string name="main_verdict_details">Подробнее</string>
 
