@@ -12,17 +12,23 @@
     <string name="settings_subsection_network">شبکه</string>
     <string name="settings_subsection_dns">DNS</string>
     <string name="settings_cat_split_tunnel">Split tunnel bypass</string>
-    <string name="settings_cat_split_tunnel_desc">اسکن پورت، TUN probe، proxy و Xray API</string>
+    <string name="settings_cat_split_tunnel_desc">پورت و probe</string>
     <string name="settings_cat_network">شبکه</string>
-    <string name="settings_cat_network_desc">درخواست‌های شبکه، CDN pulling، call transport</string>
+    <string name="settings_cat_network_desc">درخواست‌ها و CDN</string>
     <string name="settings_cat_dns">DNS</string>
-    <string name="settings_cat_dns_desc">حالت و سرورهای DNS resolver</string>
+    <string name="settings_cat_dns_desc">Resolver</string>
     <string name="settings_cat_privacy">حریم خصوصی</string>
-    <string name="settings_cat_privacy_desc">پنهان‌سازی IP در تشخیص</string>
+    <string name="settings_cat_privacy_desc">پنهان‌سازی IP</string>
     <string name="settings_cat_appearance">ظاهر</string>
     <string name="settings_cat_appearance_desc">پوسته و زبان</string>
     <string name="settings_cat_about">درباره</string>
-    <string name="settings_cat_about_desc">مجوزها و GitHub</string>
+    <string name="settings_cat_about_desc">GitHub</string>
+    <string name="settings_cat_debug">Debug</string>
+    <string name="settings_cat_debug_desc">گزارش تشخیصی</string>
+    <string name="settings_group_checks">بررسی‌ها</string>
+    <string name="settings_group_app">برنامه</string>
+    <string name="settings_group_diagnostics">تشخیص</string>
+    <string name="settings_group_info">اطلاعات</string>
     <string name="settings_split_tunnel">Split tunnel bypass</string>
     <string name="settings_split_tunnel_desc">اسکن پورت زمان زیادی می‌گیرد</string>
     <string name="settings_tun_probe_debug">Debug diagnostics</string>
@@ -428,4 +434,25 @@
     <string name="checker_vpn_known_apps_none">برنامه‌های شناخته‌شده VPN/Proxy و ارائه‌دهندگان VpnService: موردی پیدا نشد</string>
     <string name="checker_vpn_installed_app">برنامه نصب‌شده: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">برنامه VpnService را اعلان می‌کند: %1$s (%2$s)</string>
+
+    <!-- Redesign: main screen -->
+    <string name="verdict_label">حکم</string>
+    <string name="verdict_title_clean">دور زدن شناسایی نشد</string>
+    <string name="verdict_title_review">نیاز به بررسی</string>
+    <string name="verdict_title_detected">دور زدن شناسایی شد</string>
+    <string name="verdict_title_idle">بررسی آغاز نشده</string>
+    <string name="verdict_subtitle_idle">برای دیدن حکم، بررسی را اجرا کنید</string>
+    <string name="verdict_subtitle_running">بررسی در حال اجراست\u2026</string>
+    <string name="verdict_subtitle_done">بررسی تکمیل شد \u00b7 %1$d دسته</string>
+    <string name="section_check_details">جزئیات بررسی</string>
+    <string name="privacy_footer_text">بررسی به‌صورت محلی اجرا می‌شود \u00b7 ۱۶ دامنه</string>
+    <string name="privacy_footer_action">این چیست؟</string>
+    <string name="tile_hint_placeholder">\u2014</string>
+    <string name="tile_hint_loading">در حال بررسی\u2026</string>
+    <string name="tile_hint_stopped">متوقف شد</string>
+    <string name="tile_hint_clean">پاک</string>
+    <string name="tile_hint_clean_count">%1$d بررسی \u00b7 پاک</string>
+    <string name="tile_hint_detected_count">%1$d از %2$d شناسایی شد</string>
+    <string name="tile_hint_review">نیاز به بررسی</string>
+    <string name="tile_hint_error">خطا</string>
 </resources>
