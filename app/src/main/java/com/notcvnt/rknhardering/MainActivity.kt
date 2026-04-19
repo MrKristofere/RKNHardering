@@ -362,6 +362,18 @@ class MainActivity : AppCompatActivity() {
         } else if (!prefs.getBoolean(PREF_RATIONALE_SHOWN, false)) {
             showPermissionRationale()
         }
+
+        checkForAppUpdates()
+    }
+
+    private fun checkForAppUpdates() {
+        lifecycleScope.launch {
+            val updateInfo = AppUpdateChecker.fetchLatestRelease() ?: return@launch
+            val currentVersion = BuildConfig.VERSION_NAME
+            if (!AppUpdateChecker.isNewerVersion(currentVersion, updateInfo.latestVersion)) return@launch
+            if (AppUpdateChecker.isVersionSkipped(this@MainActivity, updateInfo.latestVersion)) return@launch
+            AppUpdateChecker.showUpdateDialog(this@MainActivity, currentVersion, updateInfo)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

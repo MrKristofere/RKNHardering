@@ -517,4 +517,11 @@
     <string name="checker_native_root_selinux_absent">SELinux enforcement status is not accessible</string>
     <string name="checker_native_root_uid">Process is running with root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Magisk property detected: %1$s</string>
+
+    <!-- App update checker -->
+    <string name="update_dialog_title">Update available</string>
+    <string name="update_dialog_message">Installed version: %1$s\nLatest version: %2$s</string>
+    <string name="update_dialog_download">Download</string>
+    <string name="update_dialog_skip">Skip this version</string>
+    <string name="update_dialog_later">Later</string>
 </resources>

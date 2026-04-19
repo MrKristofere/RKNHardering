@@ -501,4 +501,11 @@
     <string name="checker_native_root_selinux_absent">SELinux 强制执行状态不可访问</string>
     <string name="checker_native_root_uid">进程以 root UID 运行：%1$s</string>
     <string name="checker_native_root_magisk_prop">检测到 Magisk 属性：%1$s</string>
+
+    <!-- App update checker -->
+    <string name="update_dialog_title">有更新可用</string>
+    <string name="update_dialog_message">已安装版本：%1$s\n最新版本：%2$s</string>
+    <string name="update_dialog_download">下载</string>
+    <string name="update_dialog_skip">跳过此版本</string>
+    <string name="update_dialog_later">稍后</string>
 </resources>
