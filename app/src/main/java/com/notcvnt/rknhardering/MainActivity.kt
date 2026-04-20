@@ -3068,14 +3068,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTileFromCdn(result: CdnPullingResult) {
-        val status = when {
-            result.needsReview -> TILE_STATUS_REVIEW
-            result.hasError -> TILE_STATUS_REVIEW
-            result.detected -> TILE_STATUS_CLEAN
-            else -> TILE_STATUS_NEUTRAL
-        }
+        val status = statusFromCategory(result.detected, result.needsReview, result.hasError)
         val total = result.responses.size
         val hint = when {
+            result.detected -> getString(R.string.tile_hint_review)
             result.needsReview -> getString(R.string.tile_hint_review)
             result.hasError -> getString(R.string.tile_hint_error)
             total > 0 -> getString(R.string.tile_hint_clean_count, total)
