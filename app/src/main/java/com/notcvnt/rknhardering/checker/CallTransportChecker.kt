@@ -35,6 +35,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object CallTransportChecker {
+    private const val STUN_HTTP_TIMEOUT_MS = 4_000
+    private const val STUN_HTTP_OKHTTP_RETRY_COUNT = 0
+    private const val STUN_HTTP_NATIVE_CURL_RETRY_COUNT = 0
 
     internal data class PathDescriptor(
         val path: CallTransportNetworkPath,
@@ -74,13 +77,22 @@ object CallTransportChecker {
         val publicIpFetcher: suspend (PathDescriptor, DnsResolverConfig) -> Result<String> =
             { path, resolverConfig ->
                 when (path.path) {
-                    CallTransportNetworkPath.ACTIVE -> IfconfigClient.fetchDirectIp(resolverConfig = resolverConfig)
+                    CallTransportNetworkPath.ACTIVE ->
+                        IfconfigClient.fetchDirectIp(
+                            timeoutMs = STUN_HTTP_TIMEOUT_MS,
+                            resolverConfig = resolverConfig,
+                            okHttpRetryCount = STUN_HTTP_OKHTTP_RETRY_COUNT,
+                            nativeCurlRetryCount = STUN_HTTP_NATIVE_CURL_RETRY_COUNT,
+                        )
                     CallTransportNetworkPath.UNDERLYING ->
                         if (path.network != null)
                             IfconfigClient.fetchIpViaNetwork(
                                 primaryBinding = ResolverBinding.AndroidNetworkBinding(path.network),
                                 fallbackBinding = path.fallbackBinding(),
+                                timeoutMs = STUN_HTTP_TIMEOUT_MS,
                                 resolverConfig = resolverConfig,
+                                okHttpRetryCount = STUN_HTTP_OKHTTP_RETRY_COUNT,
+                                nativeCurlRetryCount = STUN_HTTP_NATIVE_CURL_RETRY_COUNT,
                             )
                         else
                             Result.failure(IllegalStateException("Underlying network is unavailable"))
@@ -357,7 +369,13 @@ object CallTransportChecker {
         suspend fun fetchProxyPublicIp(): String? {
             if (cachedProxyPublicIp != null) return cachedProxyPublicIp
             cachedProxyPublicIp = cancellationAwareRunCatchingSuspend {
-                IfconfigClient.fetchIpViaProxy(proxyEndpoint, resolverConfig = resolverConfig).getOrNull()
+                IfconfigClient.fetchIpViaProxy(
+                    endpoint = proxyEndpoint,
+                    timeoutMs = STUN_HTTP_TIMEOUT_MS,
+                    resolverConfig = resolverConfig,
+                    okHttpRetryCount = STUN_HTTP_OKHTTP_RETRY_COUNT,
+                    nativeCurlRetryCount = STUN_HTTP_NATIVE_CURL_RETRY_COUNT,
+                ).getOrNull()
             }.getOrNull()
             return cachedProxyPublicIp
         }

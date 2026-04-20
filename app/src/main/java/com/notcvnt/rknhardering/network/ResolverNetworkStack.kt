@@ -44,6 +44,8 @@ internal data class ResolverHttpRequest(
     val proxy: Proxy?,
     val binding: ResolverBinding?,
     val addressFamily: Class<out InetAddress>? = null,
+    val okHttpRetryCount: Int,
+    val nativeCurlRetryCount: Int,
     val cancellationSignal: ScanCancellationSignal? = null,
 )
 
@@ -95,6 +97,8 @@ object ResolverNetworkStack {
         proxy: Proxy? = null,
         binding: ResolverBinding? = null,
         addressFamily: Class<out InetAddress>? = null,
+        okHttpRetryCount: Int = OKHTTP_RETRY_COUNT,
+        nativeCurlRetryCount: Int = NATIVE_CURL_RETRY_COUNT,
         cancellationSignal: ScanCancellationSignal? = null,
     ): ResolverHttpResponse {
         val request = ResolverHttpRequest(
@@ -108,14 +112,17 @@ object ResolverNetworkStack {
             proxy = proxy,
             binding = binding,
             addressFamily = addressFamily,
+            okHttpRetryCount = okHttpRetryCount,
+            nativeCurlRetryCount = nativeCurlRetryCount,
             cancellationSignal = cancellationSignal,
         )
         return executeWithFallback(request)
     }
 
     private fun executeWithFallback(request: ResolverHttpRequest): ResolverHttpResponse {
+        val okHttpAttempts = request.okHttpRetryCount.coerceAtLeast(0) + 1
         var okHttpError: Throwable? = null
-        repeat(OKHTTP_RETRY_COUNT + 1) {
+        repeat(okHttpAttempts) {
             request.cancellationSignal?.throwIfCancelled()
             try {
                 return executeWithOkHttp(request)
@@ -127,8 +134,9 @@ object ResolverNetworkStack {
 
         request.cancellationSignal?.throwIfCancelled()
         if (NativeCurlHttpClient.canExecute(request)) {
+            val nativeCurlAttempts = request.nativeCurlRetryCount.coerceAtLeast(0) + 1
             var nativeCurlError: Throwable? = null
-            repeat(NATIVE_CURL_RETRY_COUNT + 1) {
+            repeat(nativeCurlAttempts) {
                 request.cancellationSignal?.throwIfCancelled()
                 try {
                     return NativeCurlHttpClient.execute(request, executionContext = currentExecutionContext(request))
@@ -140,8 +148,8 @@ object ResolverNetworkStack {
             throw CombinedTransportIOException(
                 okHttpError = okHttpError,
                 nativeCurlError = nativeCurlError,
-                okHttpAttempts = OKHTTP_RETRY_COUNT + 1,
-                nativeCurlAttempts = NATIVE_CURL_RETRY_COUNT + 1,
+                okHttpAttempts = okHttpAttempts,
+                nativeCurlAttempts = nativeCurlAttempts,
             )
         }
 
