@@ -10,6 +10,15 @@ import com.notcvnt.rknhardering.network.ResolverBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+data class PerTargetProbe(
+    val targetHost: String,
+    val targetGroup: com.notcvnt.rknhardering.model.TargetGroup,
+    val directIp: String? = null,
+    val vpnIp: String? = null,
+    val comparison: PublicIpNetworkComparison? = null,
+    val error: String? = null,
+)
+
 /**
  * Detects whether a non-VPN (underlying) network is reachable from this app.
  *
@@ -29,19 +38,33 @@ object UnderlyingNetworkProber {
 
     data class ProbeResult(
         val vpnActive: Boolean,
-        val underlyingReachable: Boolean,
-        val vpnIp: String? = null,
-        val underlyingIp: String? = null,
+        val underlyingReachable: Boolean = false,
+        val ruTarget: PerTargetProbe = PerTargetProbe(
+            targetHost = "",
+            targetGroup = com.notcvnt.rknhardering.model.TargetGroup.RU,
+        ),
+        val nonRuTarget: PerTargetProbe = PerTargetProbe(
+            targetHost = "",
+            targetGroup = com.notcvnt.rknhardering.model.TargetGroup.NON_RU,
+        ),
         val vpnError: String? = null,
         val underlyingError: String? = null,
-        val vpnIpComparison: PublicIpNetworkComparison? = null,
-        val underlyingIpComparison: PublicIpNetworkComparison? = null,
         val dnsPathMismatch: Boolean = false,
-        val vpnNetwork: Network? = null,
-        val underlyingNetwork: Network? = null,
+        val vpnNetwork: android.net.Network? = null,
+        val underlyingNetwork: android.net.Network? = null,
         val activeNetworkIsVpn: Boolean? = null,
         val tunProbeDiagnostics: TunProbeDiagnostics? = null,
-    )
+    ) {
+        val vpnIp: String? get() = ruTarget.vpnIp ?: nonRuTarget.vpnIp
+        val underlyingIp: String? get() = ruTarget.directIp ?: nonRuTarget.directIp
+        val vpnIpComparison: PublicIpNetworkComparison?
+            get() = ruTarget.comparison ?: nonRuTarget.comparison
+        val underlyingIpComparison: PublicIpNetworkComparison?
+            get() = ruTarget.comparison ?: nonRuTarget.comparison
+    }
+
+    private const val RU_PROBE_HOST = "ifconfig.yandex.ru"
+    private const val NON_RU_PROBE_HOST = "api.ipify.org"
 
     @Suppress("DEPRECATION")
     suspend fun probe(
@@ -96,18 +119,33 @@ object UnderlyingNetworkProber {
             )
         }
 
-        val vpnComparison = fetchIpViaNetworkComparison(vpnNetwork, resolverConfig, debugEnabled, modeOverride)
-        val vpnIp = vpnComparison.selectedIp
-        val vpnError = vpnComparison.selectedError
+        val ruVpnComparison = fetchIpViaNetworkComparison(vpnNetwork, resolverConfig, debugEnabled, modeOverride, RU_PROBE_HOST)
+        val nonRuVpnComparison = fetchIpViaNetworkComparison(vpnNetwork, resolverConfig, debugEnabled, modeOverride, NON_RU_PROBE_HOST)
+        val vpnError = ruVpnComparison.selectedError ?: nonRuVpnComparison.selectedError
+
+        val ruVpnProbe = PerTargetProbe(
+            targetHost = RU_PROBE_HOST,
+            targetGroup = com.notcvnt.rknhardering.model.TargetGroup.RU,
+            vpnIp = ruVpnComparison.selectedIp,
+            comparison = ruVpnComparison,
+            error = ruVpnComparison.selectedError,
+        )
+        val nonRuVpnProbe = PerTargetProbe(
+            targetHost = NON_RU_PROBE_HOST,
+            targetGroup = com.notcvnt.rknhardering.model.TargetGroup.NON_RU,
+            vpnIp = nonRuVpnComparison.selectedIp,
+            comparison = nonRuVpnComparison,
+            error = nonRuVpnComparison.selectedError,
+        )
 
         if (nonVpnNetworks.isEmpty()) {
             return@withContext ProbeResult(
                 vpnActive = true,
                 underlyingReachable = false,
-                vpnIp = vpnIp,
+                ruTarget = ruVpnProbe,
+                nonRuTarget = nonRuVpnProbe,
                 vpnError = vpnError,
-                vpnIpComparison = vpnComparison,
-                dnsPathMismatch = vpnComparison.dnsPathMismatch,
+                dnsPathMismatch = ruVpnComparison.dnsPathMismatch,
                 vpnNetwork = vpnNetwork.network,
                 activeNetworkIsVpn = activeNetworkIsVpn,
                 tunProbeDiagnostics = buildTunProbeDiagnostics(
@@ -117,45 +155,68 @@ object UnderlyingNetworkProber {
                     vpnNetworkPresent = true,
                     underlyingNetworkPresent = false,
                     vpnInterfaceName = vpnNetwork.interfaceName,
-                    vpnComparison = vpnComparison,
+                    vpnComparison = ruVpnComparison,
                     underlyingInterfaceName = null,
                     underlyingComparison = null,
                 ),
             )
         }
 
-        var underlyingIp: String? = null
-        var underlyingError: String? = null
+        var ruUnderlyingIp: String? = null
+        var ruUnderlyingError: String? = null
+        var nonRuUnderlyingIp: String? = null
+        var nonRuUnderlyingError: String? = null
         var usedNetwork: Network? = null
         var usedBoundNetwork: BoundNetwork? = null
-        var underlyingComparison: PublicIpNetworkComparison? = null
+        var ruUnderlyingComparison: PublicIpNetworkComparison? = null
+        var nonRuUnderlyingComparison: PublicIpNetworkComparison? = null
         var lastUnderlyingNetwork: BoundNetwork? = null
 
         for (network in nonVpnNetworks) {
-            val result = fetchIpViaNetworkComparison(network, resolverConfig, debugEnabled, modeOverride)
             lastUnderlyingNetwork = network
-            underlyingComparison = result
-            underlyingIp = result.selectedIp
-            if (underlyingIp != null) {
+
+            // Probe RU target
+            val ruResult = fetchIpViaNetworkComparison(network, resolverConfig, debugEnabled, modeOverride, RU_PROBE_HOST)
+            ruUnderlyingComparison = ruResult
+            ruUnderlyingIp = ruResult.selectedIp
+            ruUnderlyingError = ruResult.selectedError ?: ruUnderlyingError
+
+            // Probe non-RU target
+            val nonRuResult = fetchIpViaNetworkComparison(network, resolverConfig, debugEnabled, modeOverride, NON_RU_PROBE_HOST)
+            nonRuUnderlyingComparison = nonRuResult
+            nonRuUnderlyingIp = nonRuResult.selectedIp
+            nonRuUnderlyingError = nonRuResult.selectedError ?: nonRuUnderlyingError
+
+            // Consider both targets successful if either reached
+            if (ruUnderlyingIp != null || nonRuUnderlyingIp != null) {
                 usedNetwork = network.network
                 usedBoundNetwork = network
-                underlyingError = null
                 break
             }
-            underlyingError = result.selectedError ?: underlyingError
         }
+
+        val ruTarget = ruVpnProbe.copy(
+            directIp = ruUnderlyingIp,
+            comparison = ruUnderlyingComparison ?: ruVpnComparison,
+            error = if (ruUnderlyingIp == null && ruUnderlyingError != null) ruUnderlyingError else ruVpnComparison.selectedError,
+        )
+        val nonRuTarget = nonRuVpnProbe.copy(
+            directIp = nonRuUnderlyingIp,
+            comparison = nonRuUnderlyingComparison ?: nonRuVpnComparison,
+            error = if (nonRuUnderlyingIp == null && nonRuUnderlyingError != null) nonRuUnderlyingError else nonRuVpnComparison.selectedError,
+        )
 
         ProbeResult(
             vpnActive = true,
-            underlyingReachable = underlyingIp != null,
-            vpnIp = vpnIp,
-            underlyingIp = underlyingIp,
+            underlyingReachable = ruUnderlyingIp != null || nonRuUnderlyingIp != null,
+            ruTarget = ruTarget,
+            nonRuTarget = nonRuTarget,
             vpnError = vpnError,
-            underlyingError = underlyingError,
-            vpnIpComparison = vpnComparison,
-            underlyingIpComparison = underlyingComparison,
-            dnsPathMismatch = vpnComparison.dnsPathMismatch ||
-                (underlyingComparison?.dnsPathMismatch == true),
+            underlyingError = ruUnderlyingError ?: nonRuUnderlyingError,
+            dnsPathMismatch = ruVpnComparison.dnsPathMismatch ||
+                nonRuVpnComparison.dnsPathMismatch ||
+                (ruUnderlyingComparison?.dnsPathMismatch == true) ||
+                (nonRuUnderlyingComparison?.dnsPathMismatch == true),
             vpnNetwork = vpnNetwork.network,
             underlyingNetwork = usedNetwork,
             activeNetworkIsVpn = activeNetworkIsVpn,
@@ -166,9 +227,9 @@ object UnderlyingNetworkProber {
                 vpnNetworkPresent = true,
                 underlyingNetworkPresent = true,
                 vpnInterfaceName = vpnNetwork.interfaceName,
-                vpnComparison = vpnComparison,
+                vpnComparison = ruVpnComparison,
                 underlyingInterfaceName = (usedBoundNetwork ?: lastUnderlyingNetwork)?.interfaceName,
-                underlyingComparison = underlyingComparison,
+                underlyingComparison = ruUnderlyingComparison ?: nonRuUnderlyingComparison,
             ),
         )
     }
@@ -178,6 +239,7 @@ object UnderlyingNetworkProber {
         resolverConfig: DnsResolverConfig,
         debugEnabled: Boolean,
         modeOverride: TunProbeModeOverride,
+        targetHost: String? = null,
     ): PublicIpNetworkComparison {
         val fallbackBinding = boundNetwork.interfaceName
             ?.takeIf { it.isNotBlank() }
@@ -189,6 +251,7 @@ object UnderlyingNetworkProber {
             resolverConfig = resolverConfig,
             modeOverride = modeOverride,
             collectTrace = debugEnabled,
+            targetHost = targetHost,
         )
     }
 
