@@ -301,6 +301,7 @@ object VpnCheckRunner {
             indirectSigns = indirectSigns,
             locationSignals = locationSignals,
             bypassResult = bypassResult,
+            ipConsensus = com.notcvnt.rknhardering.model.IpConsensusResult.empty(),
             nativeSigns = nativeSigns,
         )
         executionContext.throwIfCancelled()
