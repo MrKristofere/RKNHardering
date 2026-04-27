@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
@@ -14,11 +15,14 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.URL
 
 object IpComparisonChecker {
 
-    private const val MAX_FETCH_ATTEMPTS = 3
+    private const val MAX_FETCH_ATTEMPTS = 1
     private const val RETRY_DELAY_MS = 250L
 
     private enum class IpFamily {
@@ -30,12 +34,23 @@ object IpComparisonChecker {
         val label: String,
         val url: String,
         val scope: IpCheckerScope,
+        val addressFamily: Class<out InetAddress>? = null,
     )
 
     private val ENDPOINTS = listOf(
         EndpointSpec(
             label = "2ip.ru",
             url = "https://2ip.ru",
+            scope = IpCheckerScope.RU,
+        ),
+        EndpointSpec(
+            label = "Yandex IPv4",
+            url = "https://ipv4-internet.yandex.net/api/v0/ip",
+            scope = IpCheckerScope.RU,
+        ),
+        EndpointSpec(
+            label = "Yandex IPv6",
+            url = "https://ipv6-internet.yandex.net/api/v0/ip",
             scope = IpCheckerScope.RU,
         ),
         EndpointSpec(
@@ -50,13 +65,15 @@ object IpComparisonChecker {
         ),
         EndpointSpec(
             label = "ifconfig.me IPv4",
-            url = "https://ipv4.ifconfig.me/ip",
+            url = "https://ifconfig.me/ip",
             scope = IpCheckerScope.NON_RU,
+            addressFamily = Inet4Address::class.java,
         ),
         EndpointSpec(
             label = "ifconfig.me IPv6",
-            url = "https://ipv6.ifconfig.me/ip",
+            url = "https://ifconfig.me/ip",
             scope = IpCheckerScope.NON_RU,
+            addressFamily = Inet6Address::class.java,
         ),
         EndpointSpec(
             label = "checkip.amazonaws.com",
@@ -82,17 +99,23 @@ object IpComparisonChecker {
 
     suspend fun check(
         context: Context,
-        timeoutMs: Int = 7000,
+        timeoutMs: Int = 5_000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
     ): IpComparisonResult = withContext(Dispatchers.IO) {
         coroutineScope {
+            val executionContext = ScanExecutionContext.currentOrDefault()
             val responses = ENDPOINTS.map { endpoint ->
                 async {
-                    val dnsRecords = PublicIpClient.resolveDnsRecords(endpoint.url, resolverConfig)
+                    val dnsRecords = PublicIpClient.resolveDnsRecords(
+                        endpoint = endpoint.url,
+                        resolverConfig = resolverConfig,
+                        executionContext = executionContext,
+                    )
                     val result = fetchIpWithRetries(
                         endpoint = endpoint.url,
                         timeoutMs = timeoutMs,
                         resolverConfig = resolverConfig,
+                        addressFamily = endpoint.addressFamily,
                     )
                     val error = result.exceptionOrNull()?.let(::formatError)
                     IpCheckerResponse(
@@ -119,15 +142,24 @@ object IpComparisonChecker {
         endpoint: String,
         timeoutMs: Int,
         resolverConfig: DnsResolverConfig,
+        addressFamily: Class<out InetAddress>? = null,
         maxAttempts: Int = MAX_FETCH_ATTEMPTS,
         retryDelayMs: Long = RETRY_DELAY_MS,
-        fetcher: (String, Int, DnsResolverConfig) -> Result<String> = { url, timeout, resolver ->
-            PublicIpClient.fetchIp(url, timeout, resolverConfig = resolver)
+        fetcher: (String, Int, DnsResolverConfig, Class<out InetAddress>?) -> Result<String> = { url, timeout, resolver, family ->
+            PublicIpClient.fetchIp(
+                endpoint = url,
+                timeoutMs = timeout,
+                resolverConfig = resolver,
+                addressFamily = family,
+                executionContext = ScanExecutionContext.currentOrDefault(),
+            )
         },
     ): Result<String> {
+        val executionContext = ScanExecutionContext.currentOrDefault()
         var lastError: Throwable? = null
         repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
-            val result = fetcher(endpoint, timeoutMs, resolverConfig)
+            executionContext.throwIfCancelled()
+            val result = fetcher(endpoint, timeoutMs, resolverConfig, addressFamily)
             if (result.isSuccess) {
                 return result
             }
@@ -177,15 +209,24 @@ object IpComparisonChecker {
                 rawMismatch
             )
 
+        val ipv4OnlyConsensusIp = (ruGroup.canonicalIp ?: nonRuGroup.canonicalIp)?.takeIf {
+            (ruGroup.ignoredIpv6ErrorCount > 0 || nonRuGroup.ignoredIpv6ErrorCount > 0) &&
+                !ruGroup.detected &&
+                !nonRuGroup.detected &&
+                !ruGroup.needsReview &&
+                !nonRuGroup.needsReview
+        }
+        val hasAnySuccessfulIp = responses.any { it.ip != null }
+
         val summary = when {
             detected -> context.getString(R.string.checker_ip_comp_summary_detected, ruGroup.canonicalIp, nonRuGroup.canonicalIp)
             familyMismatch -> context.getString(R.string.checker_ip_comp_summary_family_mismatch, ruGroup.canonicalIp, nonRuGroup.canonicalIp)
             rawMismatch -> context.getString(R.string.checker_ip_comp_summary_raw_mismatch, ruGroup.canonicalIp, nonRuGroup.canonicalIp)
-            ruGroup.ignoredIpv6ErrorCount > 0 || nonRuGroup.ignoredIpv6ErrorCount > 0 ->
-                context.getString(R.string.checker_ip_comp_summary_ipv4_only, ruGroup.canonicalIp ?: nonRuGroup.canonicalIp)
+            ipv4OnlyConsensusIp != null ->
+                context.getString(R.string.checker_ip_comp_summary_ipv4_only, ipv4OnlyConsensusIp)
             ruGroup.canonicalIp != null && nonRuGroup.canonicalIp != null ->
                 context.getString(R.string.checker_ip_comp_summary_all_same, ruGroup.canonicalIp)
-            ruGroup.canonicalIp == null && nonRuGroup.canonicalIp == null ->
+            !hasAnySuccessfulIp ->
                 context.getString(R.string.checker_ip_comp_summary_no_response)
             else -> context.getString(R.string.checker_ip_comp_summary_incomplete)
         }

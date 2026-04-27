@@ -1,6 +1,8 @@
 package com.notcvnt.rknhardering.probe
 
 import android.util.Base64
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.xray.app.proxyman.command.HandlerServiceGrpc
 import com.xray.app.proxyman.command.ListOutboundsRequest
 import com.xray.app.proxyman.SenderConfig as ProxymanSenderConfig
@@ -20,16 +22,25 @@ class XrayApiClient(
     suspend fun listOutbounds(
         port: Int,
         deadlineMs: Long = 600,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<XrayApiScanResult> = withContext(Dispatchers.IO) {
         val channel = OkHttpChannelBuilder.forAddress(host, port)
             .usePlaintext()
             .build()
+        val grpcContext = io.grpc.Context.current().withCancellation()
+        val registration = executionContext.cancellationSignal.register {
+            grpcContext.cancel(kotlinx.coroutines.CancellationException("Scan cancelled"))
+            channel.shutdownNow()
+        }
 
         try {
-            val stub = HandlerServiceGrpc.newBlockingStub(channel)
-                .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
+            executionContext.throwIfCancelled()
+            val response = grpcContext.call {
+                val stub = HandlerServiceGrpc.newBlockingStub(channel)
+                    .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
 
-            val response = stub.listOutbounds(ListOutboundsRequest.getDefaultInstance())
+                stub.listOutbounds(ListOutboundsRequest.getDefaultInstance())
+            }
             val outbounds = response.outboundsList
                 .filterNot { outbound ->
                     outbound.proxySettings.type == "xray.proxy.freedom.Config" ||
@@ -63,8 +74,10 @@ class XrayApiClient(
                 ),
             )
         } catch (e: Exception) {
+            rethrowIfCancellation(e, executionContext)
             Result.failure(e)
         } finally {
+            registration.dispose()
             channel.shutdownNow()
             channel.awaitTermination(100, TimeUnit.MILLISECONDS)
         }

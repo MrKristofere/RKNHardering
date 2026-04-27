@@ -14,6 +14,8 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
     private lateinit var prefs: SharedPreferences
 
     private lateinit var switchNetworkRequests: MaterialSwitch
+    private lateinit var cardAutoUpdate: MaterialCardView
+    private lateinit var switchAutoUpdate: MaterialSwitch
     private lateinit var cardCdnPulling: MaterialCardView
     private lateinit var switchCdnPulling: MaterialSwitch
     private lateinit var cardCdnPullingMeduza: MaterialCardView
@@ -21,8 +23,11 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
     private lateinit var cardCallTransportProbe: MaterialCardView
     private lateinit var switchCallTransportProbe: MaterialSwitch
 
+    private var suppressAutoUpdateToggleCallback = false
     private var suppressCdnPullingToggleCallback = false
+    private var suppressNetworkRequestsToggleCallback = false
     private var cdnWarningDialog: AlertDialog? = null
+    private var networkDisableDialog: AlertDialog? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -36,10 +41,14 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
         super.onDestroyView()
         cdnWarningDialog?.dismiss()
         cdnWarningDialog = null
+        networkDisableDialog?.dismiss()
+        networkDisableDialog = null
     }
 
     private fun bindViews(view: View) {
         switchNetworkRequests = view.findViewById(R.id.switchNetworkRequests)
+        cardAutoUpdate = view.findViewById(R.id.cardAutoUpdate)
+        switchAutoUpdate = view.findViewById(R.id.switchAutoUpdate)
         cardCdnPulling = view.findViewById(R.id.cardCdnPulling)
         switchCdnPulling = view.findViewById(R.id.switchCdnPulling)
         cardCdnPullingMeduza = view.findViewById(R.id.cardCdnPullingMeduza)
@@ -49,37 +58,35 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
     }
 
     private fun loadSettings() {
-        switchNetworkRequests.isChecked = prefs.getBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, true)
+        val networkRequestsEnabled = prefs.getBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, true)
+        switchNetworkRequests.isChecked = networkRequestsEnabled
+        setAutoUpdateSwitch(networkRequestsEnabled && AppUpdateChecker.isAutoUpdateEnabled(requireContext()))
         switchCdnPulling.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CDN_PULLING_ENABLED, false)
         switchCdnPullingMeduza.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CDN_PULLING_MEDUZA_ENABLED, true)
         switchCallTransportProbe.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
 
-        updateCdnPullingEnabled(switchNetworkRequests.isChecked)
+        updateAutoUpdateEnabled(networkRequestsEnabled)
+        updateCdnPullingEnabled(networkRequestsEnabled)
         updateCdnPullingMeduzaVisible(switchCdnPulling.isChecked)
-        updateCallTransportEnabled(switchNetworkRequests.isChecked)
+        updateCallTransportEnabled(networkRequestsEnabled)
     }
 
     private fun setupListeners() {
         switchNetworkRequests.setOnCheckedChangeListener { _, isChecked ->
-            updateCdnPullingEnabled(isChecked)
-            updateCallTransportEnabled(isChecked)
+            if (suppressNetworkRequestsToggleCallback) return@setOnCheckedChangeListener
             if (!isChecked) {
-                AlertDialog.Builder(requireContext())
-                    .setTitle(R.string.settings_network_disable_title)
-                    .setMessage(R.string.settings_network_disable_message)
-                    .setPositiveButton(R.string.settings_network_disable_confirm) { _, _ ->
-                        prefs.edit { putBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, false) }
-                    }
-                    .setNegativeButton(android.R.string.cancel) { _, _ ->
-                        switchNetworkRequests.isChecked = true
-                    }
-                    .setOnCancelListener {
-                        switchNetworkRequests.isChecked = true
-                    }
-                    .show()
+                showNetworkDisableConfirmation()
             } else {
                 prefs.edit { putBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, true) }
+                updateAutoUpdateEnabled(true)
+                updateCdnPullingEnabled(true)
+                updateCallTransportEnabled(true)
             }
+        }
+
+        switchAutoUpdate.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressAutoUpdateToggleCallback) return@setOnCheckedChangeListener
+            AppUpdateChecker.setAutoUpdateEnabled(requireContext(), isChecked)
         }
 
         switchCdnPulling.setOnCheckedChangeListener { _, isChecked ->
@@ -101,10 +108,21 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
         }
     }
 
+    private fun updateAutoUpdateEnabled(enabled: Boolean) {
+        cardAutoUpdate.alpha = if (enabled) 1.0f else 0.5f
+        setViewAndChildrenEnabled(cardAutoUpdate, enabled)
+        if (!enabled) {
+            AppUpdateChecker.setAutoUpdateEnabled(requireContext(), false, markChoiceMade = false)
+            setAutoUpdateSwitch(false)
+        } else {
+            setAutoUpdateSwitch(AppUpdateChecker.isAutoUpdateEnabled(requireContext()))
+        }
+    }
+
     private fun updateCdnPullingEnabled(enabled: Boolean) {
         cardCdnPulling.alpha = if (enabled) 1.0f else 0.5f
         setViewAndChildrenEnabled(cardCdnPulling, enabled)
-        if (!enabled) updateCdnPullingMeduzaVisible(false)
+        updateCdnPullingMeduzaVisible(enabled && switchCdnPulling.isChecked)
     }
 
     private fun updateCdnPullingMeduzaVisible(visible: Boolean) {
@@ -137,5 +155,36 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
         suppressCdnPullingToggleCallback = true
         switchCdnPulling.isChecked = checked
         suppressCdnPullingToggleCallback = false
+    }
+
+    private fun setAutoUpdateSwitch(checked: Boolean) {
+        suppressAutoUpdateToggleCallback = true
+        switchAutoUpdate.isChecked = checked
+        suppressAutoUpdateToggleCallback = false
+    }
+
+    private fun showNetworkDisableConfirmation() {
+        networkDisableDialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.settings_network_disable_title)
+            .setMessage(R.string.settings_network_disable_message)
+            .setPositiveButton(R.string.settings_network_disable_confirm) { _, _ ->
+                prefs.edit { putBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, false) }
+                updateAutoUpdateEnabled(false)
+                updateCdnPullingEnabled(false)
+                updateCallTransportEnabled(false)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                setNetworkRequestsSwitch(true)
+            }
+            .setOnCancelListener {
+                setNetworkRequestsSwitch(true)
+            }
+            .show()
+    }
+
+    private fun setNetworkRequestsSwitch(checked: Boolean) {
+        suppressNetworkRequestsToggleCallback = true
+        switchNetworkRequests.isChecked = checked
+        suppressNetworkRequestsToggleCallback = false
     }
 }

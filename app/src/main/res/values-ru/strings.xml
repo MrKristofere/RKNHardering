@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">RKNHardering</string>
     <string name="github_repo_url">https://github.com/xtclovver/RKNHardering</string>
-    <string name="run_check_notice">Во время проверки приложение выполнит сетевые запросы к доменам:\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ip.mail.ru\n• api4.ipify.org\n• api6.ipify.org\n• 2ip.ru\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\nЕсли в настройках выбран кастомный DNS-резолвер, приложение также будет обращаться к его IP-адресам или DoH-домену.\n\nЕсли включён CDN pulling, приложение дополнительно отправит HTTPS-запросы к redirector.googlevideo.com, rutracker.org и meduza.io, чтобы проверить, какой внешний IP и trace-данные эти точки вернут.\n\nЕсли включена проверка утечек call transport, приложение дополнительно отправит UDP/STUN-запросы к встроенным Telegram-целям. Цели WhatsApp используются только в debug или experimental сборках.\n\nЕсли включена отладочная диагностика, приложение сможет сформировать копируемый диагностический отчёт по последней завершённой проверке, даже если она прошла успешно. Отчёт хранится только в памяти, пока вы его не скопируете. Ответы CDN pulling тоже попадут в этот отчёт.\n\nНажимая кнопку «Запустить проверку», вы соглашаетесь, что с вашего устройства будут выполнены эти сетевые запросы.\n\nПриложение не ведет логи этих запросов. Доступ к сети можно будет отключить в настройках приложения.</string>
+    <string name="run_check_notice">Во время проверки приложение выполнит сетевые запросы к доменам:\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ip.mail.ru\n• api4.ipify.org\n• api6.ipify.org\n• 2ip.ru\n• ipv4-internet.yandex.net\n• ipv6-internet.yandex.net\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\nЕсли в настройках выбран кастомный DNS-резолвер, приложение также будет обращаться к его IP-адресам или DoH-домену.\n\nЕсли включён CDN pulling, приложение дополнительно отправит HTTPS-запросы к redirector.googlevideo.com, rutracker.org и meduza.io, чтобы проверить, какой внешний IP и trace-данные эти точки вернут.\n\nЕсли включена проверка утечек call transport, приложение дополнительно отправит UDP/STUN-запросы к встроенным Telegram-целям. Цели WhatsApp используются только в debug или experimental сборках.\n\nЕсли включена проверка подмены ICMP, приложение дополнительно выполнит DNS-резолв и ping для instagram.com и google.com, чтобы сравнить доступность заблокированной цели и подозрительно низкие RTT.\n\nЕсли включена отладочная диагностика, приложение сможет сформировать копируемый диагностический отчёт по последней завершённой проверке, даже если она прошла успешно. Отчёт хранится только в памяти, пока вы его не скопируете. Ответы CDN pulling тоже попадут в этот отчёт.\n\nНажимая кнопку «Запустить проверку», вы соглашаетесь, что с вашего устройства будут выполнены эти сетевые запросы.\n\nПриложение не ведет логи этих запросов. Доступ к сети можно будет отключить в настройках приложения.</string>
 
     <string name="settings_title">Настройки</string>
     <string name="settings_section_checks">Проверки</string>
@@ -12,17 +12,23 @@
     <string name="settings_subsection_network">Сеть</string>
     <string name="settings_subsection_dns">DNS</string>
     <string name="settings_cat_split_tunnel">Split tunnel bypass</string>
-    <string name="settings_cat_split_tunnel_desc">Скан портов, TUN probe, proxy и Xray API</string>
+    <string name="settings_cat_split_tunnel_desc">Порты и probe</string>
     <string name="settings_cat_network">Сеть</string>
-    <string name="settings_cat_network_desc">Сетевые запросы, CDN pulling, call transport</string>
+    <string name="settings_cat_network_desc">Запросы и CDN</string>
     <string name="settings_cat_dns">DNS</string>
-    <string name="settings_cat_dns_desc">Режим и серверы DNS-резолвера</string>
+    <string name="settings_cat_dns_desc">Резолвер</string>
     <string name="settings_cat_privacy">Приватность</string>
-    <string name="settings_cat_privacy_desc">Маскировка IP в диагностике</string>
+    <string name="settings_cat_privacy_desc">Маскировка IP</string>
     <string name="settings_cat_appearance">Оформление</string>
     <string name="settings_cat_appearance_desc">Тема и язык</string>
     <string name="settings_cat_about">О приложении</string>
-    <string name="settings_cat_about_desc">Разрешения и GitHub</string>
+    <string name="settings_cat_about_desc">GitHub</string>
+    <string name="settings_cat_debug">Отладка</string>
+    <string name="settings_cat_debug_desc">Копия диагностики</string>
+    <string name="settings_group_checks">Проверки</string>
+    <string name="settings_group_app">Приложение</string>
+    <string name="settings_group_diagnostics">Диагностика</string>
+    <string name="settings_group_info">Информация</string>
     <string name="settings_split_tunnel">Split tunnel bypass</string>
     <string name="settings_split_tunnel_desc">Сканирование портов занимает много времени</string>
     <string name="settings_tun_probe_debug">Отладочная диагностика</string>
@@ -43,9 +49,11 @@
     <string name="settings_port_full">Полный</string>
     <string name="settings_port_custom">Кастомный</string>
     <string name="settings_network_requests">Сетевые запросы</string>
-    <string name="settings_network_requests_desc">GeoIP, IP сравнение, CDN pulling, BeaconDB</string>
+    <string name="settings_network_requests_desc">GeoIP, IP сравнение, CDN pulling, BeaconDB, проверка call transport, подмена ICMP</string>
+    <string name="settings_auto_update">Проверка обновлений</string>
+    <string name="settings_auto_update_desc">Проверяет GitHub Releases и предлагает скачать более новую APK.</string>
     <string name="settings_network_disable_title">Отключить сетевые запросы?</string>
-    <string name="settings_network_disable_message">При отключении:\n\n• GeoIP проверка не будет выполнена\n• Сравнение IP-адресов через внешние сервисы отключится\n• Проверка CDN pulling отключится\n• Геолокация через BeaconDB (вышки/Wi-Fi) отключится\n• Проверка утечек call transport отключится\n\nБудут работать только локальные проверки: прямые признаки, косвенные признаки, сканирование портов</string>
+    <string name="settings_network_disable_message">При отключении:\n\n• GeoIP проверка не будет выполнена\n• Сравнение IP-адресов через внешние сервисы отключится\n• Проверка CDN pulling отключится\n• Геолокация через BeaconDB (вышки/Wi-Fi) отключится\n• Проверка утечек call transport отключится\n• Проверка подмены ICMP отключится\n\nБудут работать только локальные проверки: прямые признаки, косвенные признаки, сканирование портов</string>
     <string name="settings_network_disable_confirm">Отключить</string>
     <string name="settings_cdn_pulling">CDN pulling</string>
     <string name="settings_cdn_pulling_desc">Отправляет HTTPS-запросы к Google/YouTube redirector и Cloudflare trace endpoints.</string>
@@ -54,8 +62,8 @@
     <string name="settings_cdn_pulling_warning_confirm">Включить</string>
     <string name="settings_cdn_pulling_meduza">Включить meduza.io</string>
     <string name="settings_cdn_pulling_meduza_desc">Отправлять запрос на meduza.io/cdn-cgi/trace в рамках CDN pulling.</string>
-    <string name="settings_call_transport_probe">Утечки call transport</string>
-    <string name="settings_call_transport_probe_desc">Отправляет дополнительные UDP/STUN-запросы к встроенным Telegram-целям. Трассировка WhatsApp работает только в debug или experimental сборках.</string>
+    <string name="settings_call_transport_probe">Call transport и STUN-проверка</string>
+    <string name="settings_call_transport_probe_desc">Отправляет UDP/STUN-запросы к публичным STUN-серверам (глобальным и российским) и проверяет локальный SOCKS5-прокси на наличие трафика Telegram MTProto.</string>
     <string name="settings_dns_resolver">DNS-резолвер</string>
     <string name="settings_dns_resolver_desc">Применяется к GeoIP, IP Comparison и BeaconDB. Не меняет системный DNS Android и не влияет на локальные DNS-проверки.</string>
     <string name="settings_dns_mode_system">Системный</string>
@@ -88,13 +96,24 @@
     <string name="settings_github">GitHub</string>
     <string name="main_copy_diagnostics">Копировать диагностику</string>
     <string name="main_diagnostics_copied">Диагностика скопирована</string>
+    <string name="main_export">Экспорт</string>
+    <string name="main_export_title">Экспорт результата</string>
+    <string name="main_export_markdown">Markdown (.md)</string>
+    <string name="main_export_json">JSON (.json)</string>
+    <string name="main_export_save_file">Сохранить файл</string>
+    <string name="main_export_copy_to_clipboard">Копировать в буфер</string>
+    <string name="main_export_copied">Экспорт скопирован</string>
+    <string name="main_export_saved">Экспорт сохранён</string>
+    <string name="main_export_failed">Не удалось сохранить экспорт</string>
     <string name="settings_github_desc">xtclovver/RKNHardering</string>
     <string name="settings_port_range_from">От</string>
     <string name="settings_port_range_to">До</string>
 
     <string name="main_subtitle">Самопроверка на обнаружение VPN/Proxy</string>
     <string name="main_run_check">Запустить проверку</string>
+    <string name="main_run_check_again">Запустить проверку снова</string>
     <string name="main_stop_check">Остановить</string>
+    <string name="main_card_geo_ip" translatable="false">GeoIP</string>
     <string name="main_card_ip_comparison">Сравнение IP</string>
     <string name="main_card_cdn_pulling">CDN pulling</string>
     <string name="main_card_direct_signs">Прямые признаки</string>
@@ -108,11 +127,35 @@
     <string name="main_card_call_transport_path_active">Активная сеть</string>
     <string name="main_card_call_transport_path_underlying">Базовая сеть</string>
     <string name="main_card_call_transport_path_proxy">Локальный прокси</string>
+    <string name="main_card_call_transport_header">%1$s · %2$s · %3$s</string>
     <string name="main_card_call_transport_reason_no_response">STUN-ответ не получен</string>
     <string name="main_card_call_transport_reason_telegram_dc_unreachable">Telegram DC недостижим через локальный SOCKS5-прокси</string>
-    <string name="main_card_call_transport_reason_release_only">Трассировка WhatsApp доступна только в debug или experimental сборке</string>
     <string name="main_card_call_transport_reason_targets_unavailable">Цели для этой проверки недоступны</string>
+    <string name="main_card_call_transport_stun_group_global">Глобальный STUN</string>
+    <string name="main_card_call_transport_stun_group_ru">STUN (RU)</string>
+    <string name="ip_channels_title">IP каналы</string>
+    <string name="ip_channels_channel_direct">Напрямую</string>
+    <string name="ip_channels_channel_vpn">VPN</string>
+    <string name="ip_channels_channel_proxy">Прокси</string>
+    <string name="ip_channels_channel_cdn">CDN</string>
+    <string name="ip_channels_target_ru">RU</string>
+    <string name="ip_channels_target_non_ru">Не-RU</string>
+    <string name="ip_channels_flag_cross_channel_mismatch">Обнаружено расхождение между каналами</string>
+    <string name="ip_channels_flag_warp_like_behavior">Обнаружено WARP-подобное поведение</string>
+    <string name="ip_channels_flag_geo_country_mismatch">Расхождение по geo-country</string>
+    <string name="ip_channels_flag_probe_target_divergence">Расхождение по probe-target</string>
+    <string name="ip_channels_flag_probe_target_direct_divergence">Расхождение по direct probe-target</string>
+    <string name="ip_channels_flag_channel_conflict">Конфликт каналов: %1$s</string>
+    <string name="ip_channels_flag_needs_review">Требует проверки</string>
+    <string name="main_card_call_transport_stun_responded">%1$d из %2$d ответили</string>
+    <string name="main_card_call_transport_stun_none_responded">Нет ответа</string>
+    <string name="main_card_call_transport_stun_ipv4">IPv4</string>
+    <string name="main_card_call_transport_stun_ipv6">IPv6</string>
+    <string name="main_card_call_transport_stun_no_response">Нет ответа</string>
+    <string name="main_card_call_transport_stun_error">Ошибка</string>
+    <string name="main_card_icmp_spoofing">Подмена ICMP β</string>
     <string name="main_card_location_signals">Сигналы местоположения</string>
+    <string name="main_card_native_signs">Нативные признаки</string>
     <string name="main_verdict_details">Подробнее</string>
 
     <string name="main_perm_title">Дополнительное разрешение</string>
@@ -132,12 +175,27 @@
 
     <string name="main_loading_status_scanning">Сканирование</string>
     <string name="main_loading_status_checking">Проверяется</string>
+    <string name="main_loading_status_progress" translatable="false">%1$s%2$s</string>
+
+    <string name="main_preview_geo_ip">Будет выполнена сверка страны, ASN и признаков хостинга.</string>
+    <string name="main_preview_ip_comparison">Будет выполнено сравнение внешнего IP через несколько независимых сервисов.</string>
+    <string name="main_preview_cdn_pulling">Будет проверено, какие сетевые данные вернут заблокированные или CDN-backed endpoints.</string>
+    <string name="main_preview_direct">Будет проведен поиск прямых признаков VPN, прокси и установленных клиентов.</string>
+    <string name="main_preview_indirect">Будет выполнена проверка интерфейсов, DNS, маршрутов и локальных технических сигналов.</string>
+    <string name="main_preview_native_signs">Будет выполнена проверка нативных интерфейсов, маршрутов и низкоуровневых сигналов библиотек.</string>
+    <string name="main_preview_call_transport">Будут проверены ответы STUN-серверов и сигналы утечки call transport.</string>
+    <string name="main_preview_icmp">Будет выполнен резолв и пинг заблокированной и контрольной цели через активный маршрут.</string>
+    <string name="main_preview_location">Будет выполнен сбор сигналов оператора, вышек и ближайших Wi-Fi точек.</string>
+    <string name="main_preview_bypass">Будет выполнен поиск локального split tunnel bypass и доступных proxy endpoints.</string>
 
     <string name="main_loading_geo_ip">Сверяем страну, ASN и признаки хостинга.</string>
     <string name="main_loading_ip_comparison">Сравниваем внешний IP через несколько независимых сервисов.</string>
     <string name="main_loading_cdn_pulling">Проверяем, какие сетевые данные вернут заблокированные или CDN-backed endpoints.</string>
+    <string name="main_loading_icmp">Резолвим и пингуем заблокированную и контрольную цели через активный маршрут.</string>
     <string name="main_loading_direct">Ищем прямые признаки VPN, прокси и установленных клиентов.</string>
     <string name="main_loading_indirect">Проверяем интерфейсы, DNS, маршруты и локальные технические сигналы.</string>
+    <string name="main_loading_native_signs">Проверяем нативные интерфейсы, маршруты и низкоуровневые сигналы библиотек.</string>
+    <string name="main_loading_call_transport">Проверяем ответы STUN-серверов и сигналы утечки call transport.</string>
     <string name="main_loading_location">Собираем сигналы оператора, вышек и ближайших Wi-Fi точек.</string>
     <string name="main_loading_bypass">Ищем локальный split tunnel bypass и доступные proxy endpoints.</string>
 
@@ -160,11 +218,14 @@
     <string name="main_verdict_hide_details">Скрыть детали</string>
 
     <string name="main_ipv6_error_ignored">IPv6-ошибка проигнорирована: </string>
+    <string name="main_ip_comparison_ipv4_unavailable">IPv4: н/д</string>
 
     <string name="settings_port_range_preview_proxy_xray">Будут сканироваться localhost-порты для proxy и Xray API: %1$s (%2$s)</string>
     <string name="settings_port_range_preview_proxy_only">Будут сканироваться localhost-порты для proxy: %1$s (%2$s)</string>
     <string name="settings_port_range_preview_xray_only">Будут сканироваться localhost-порты для Xray API: %1$s (%2$s)</string>
     <string name="settings_port_range_preview_disabled">Локальные сканы proxy и Xray отключены.</string>
+    <string name="settings_port_range_start_default" translatable="false">1024</string>
+    <string name="settings_port_range_end_default" translatable="false">65535</string>
     <plurals name="settings_port_word">
         <item quantity="one">%1$s порт</item>
         <item quantity="few">%1$s порта</item>
@@ -238,6 +299,7 @@
     <string name="narrative_reason_direct_signs">Найдены прямые признаки локального proxy/VPN.</string>
     <string name="narrative_reason_indirect_signs">Найдены косвенные признаки туннеля, маршрутов или DNS-подмены.</string>
     <string name="narrative_reason_call_transport_signal">Цель call transport ответила и раскрыла mapped/public network data.</string>
+    <string name="narrative_reason_icmp_signal">ICMP-доступность или RTT выглядели нетипично для обычного российского маршрута.</string>
     <string name="narrative_reason_fallback_detected">Вердикт собран из сочетания нескольких сигналов проверки.</string>
     <string name="narrative_reason_fallback_review">Сигналы частичные или противоречивые, поэтому нужен ручной разбор.</string>
     <string name="narrative_reason_fallback_clean">Решающие сигналы обхода не найдены.</string>
@@ -299,6 +361,8 @@
     <string name="checker_cdn_pulling_summary_detected_partial">%2$d из %3$d CDN-целей ответили и показали IP %1$s</string>
     <string name="checker_cdn_pulling_summary_detected_no_ip">%1$d из %2$d CDN-целей вернули trace-данные, но не во всех ответах был IP</string>
     <string name="checker_cdn_pulling_error_unrecognized">Формат ответа не распознан</string>
+    <string name="checker_cdn_pulling_error_tls_certificate">Не удалось проверить доверенную цепочку TLS-сертификата. Возможные причины: HTTPS-перехват, неверный DNS-ответ или устаревшее хранилище корневых сертификатов Android.</string>
+    <string name="checker_cdn_pulling_error_details">Детали: %1$s</string>
 
     <!-- DirectSignsChecker -->
     <string name="checker_direct_category_name">Прямые признаки</string>
@@ -403,9 +467,13 @@
     </plurals>
     <string name="checker_bypass_vpn_not_active">Underlying network: VPN не активен, проверка не требуется</string>
     <string name="checker_bypass_vpn_network_binding">VPN network binding: приложение видит и VPN Network, и non-VPN default сеть (VPN IP: %1$s, direct IP: %2$s)</string>
-    <string name="checker_bypass_tun_probe_success">TUN активный зонд: запрос через VPN Network вернул IP %1$s (TUN — живой маршрутизируемый интерфейс)</string>
-    <string name="checker_bypass_tun_probe_success_transport_only">TUN активный зонд: curl-compatible transport-only путь вернул IP %1$s (SO_BINDTODEVICE + системный DNS)</string>
-    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN активный зонд: curl-compatible путь вернул IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success">TUN активный зонд: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct">TUN активный зонд, напрямую: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy">TUN активный зонд, прокси: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct_target">TUN активный зонд, %1$s, напрямую: IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy_target">TUN активный зонд, %1$s, через прокси: IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_transport_only">TUN активный зонд: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN активный зонд: IP %1$s</string>
     <string name="checker_bypass_tun_probe_failure">TUN активный зонд: запрос через VPN Network недоступен (интерфейс заблокирован или filtered)</string>
     <string name="checker_bypass_tun_probe_failure_reason">TUN активный зонд: запрос через VPN Network завершился ошибкой (%1$s)</string>
     <string name="checker_bypass_tun_probe_dns_mismatch">TUN активный зонд: strict same-path завершился ошибкой (%1$s), но curl-compatible transport-only путь сработал; вероятен mismatch DNS-path</string>
@@ -433,4 +501,90 @@
     <string name="checker_vpn_known_apps_none">Известные VPN/Proxy-приложения и VpnService-провайдеры: не обнаружены</string>
     <string name="checker_vpn_installed_app">Установлено приложение: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">Приложение объявляет VpnService: %1$s (%2$s)</string>
+
+    <!-- Redesign: main screen -->
+    <string name="verdict_label">Вердикт</string>
+    <string name="verdict_title_clean">Обход не выявлен</string>
+    <string name="verdict_title_review">Требует проверки</string>
+    <string name="verdict_title_detected">Обход выявлен</string>
+    <string name="verdict_title_idle">Проверка не запущена</string>
+    <string name="verdict_subtitle_idle">Запустите проверку, чтобы увидеть вердикт</string>
+    <string name="verdict_subtitle_running">Проверка выполняется\u2026</string>
+    <string name="verdict_subtitle_done">Завершено \u00b7 %1$d категорий</string>
+    <string name="section_check_details">Детали проверки</string>
+    <string name="privacy_footer_text">Проверка выполняется локально \u00b7 16 доменов</string>
+    <string name="privacy_footer_action">Что это?</string>
+    <string name="tile_hint_placeholder">\u2014</string>
+    <string name="tile_hint_loading">Проверка\u2026</string>
+    <string name="tile_hint_stopped">Остановлено</string>
+    <string name="tile_hint_clean">Чисто</string>
+    <string name="tile_hint_clean_count">%1$d проверок \u00b7 чисто</string>
+    <string name="tile_hint_detected_count">%1$d из %2$d выявлено</string>
+    <string name="tile_hint_review">Требует проверки</string>
+    <string name="tile_hint_error">Ошибка</string>
+    <string name="settings_value_on">Вкл</string>
+    <string name="settings_value_off">Выкл</string>
+    <string name="settings_value_network_all">Все запросы</string>
+    <string name="settings_value_network_disabled">Отключено</string>
+    <string name="settings_value_privacy_masking">Маскировка IP</string>
+    <string name="settings_value_appearance_format">%1$s \u00b7 %2$s</string>
+
+    <!-- NativeSignsChecker -->
+    <string name="checker_native_category_name">Нативные признаки β</string>
+    <string name="checker_icmp_summary_clean">%1$s не ответил, а у %2$s RTT остался выше порога (avg %3$s)</string>
+    <string name="checker_icmp_summary_blocked_replied">%1$s ответил на ICMP, хотя для российского маршрута ожидается отсутствие ответа</string>
+    <string name="checker_icmp_summary_control_too_fast">%1$s ответил с подозрительно низким RTT (min %2$s, avg %3$s)</string>
+    <string name="checker_icmp_summary_both_suspicious">%1$s ответил, а у %2$s RTT оказался слишком низким (min %3$s, avg %4$s)</string>
+    <string name="checker_icmp_summary_inconclusive">ICMP-проверка неинформативна: %1$s не ответил</string>
+    <string name="checker_icmp_summary_unavailable">Проверка подмены ICMP недоступна на этом устройстве</string>
+    <string name="checker_icmp_target_blocked">Заблокированная цель %1$s (%2$s): ответов %3$d/%4$d</string>
+    <string name="checker_icmp_target_control">Контрольная цель %1$s (%2$s): ответов %3$d/%4$d, min %5$s, avg %6$s, max %7$s</string>
+    <string name="checker_icmp_evidence_both">%1$s ответил, а RTT у %2$s оказался ниже ожидаемого порога</string>
+    <string name="checker_icmp_evidence_blocked_replied">%1$s ответил по ICMP через активный маршрут</string>
+    <string name="checker_icmp_evidence_control_too_fast">%1$s показал RTT ниже ожидаемого порога на активном маршруте</string>
+    <string name="checker_native_card_title">Нативные низкоуровневые проверки β</string>
+    <string name="checker_native_unavailable">Нативная библиотека не загружена; проверки недоступны.</string>
+    <string name="checker_native_unavailable_with_reason">Нативная библиотека не загружена: %1$s</string>
+    <string name="checker_native_no_anomalies">Нативные сигналы: аномалий не обнаружено</string>
+    <string name="checker_native_interfaces_empty">getifaddrs() не вернул интерфейсов</string>
+    <string name="checker_native_interfaces_summary">getifaddrs(): %1$d интерфейсов (%2$d активны)</string>
+    <string name="checker_native_vpn_interface">Нативный VPN-интерфейс: %1$s (индекс %2$d, MTU %3$d)</string>
+    <string name="checker_native_ipsec_interface">Нативный IPsec-интерфейс: %1$s (индекс %2$d)</string>
+    <string name="checker_native_mismatch_missing_in_jvm">Интерфейс %1$s: виден нативно, но отсутствует в JVM</string>
+    <string name="checker_native_mismatch_missing_in_native">Интерфейс %1$s: виден в JVM, но отсутствует нативно</string>
+    <string name="checker_native_mismatch_index">Интерфейс %1$s: расхождение индекса native=%2$d jvm=%3$d</string>
+    <string name="checker_native_mismatch_addresses">Интерфейс %1$s: расхождение адресов native-only=%2$s, jvm-only=%3$s</string>
+    <string name="checker_native_routes_empty">/proc/net/route: недоступен</string>
+    <string name="checker_native_routes_no_default">/proc/net/route: default-маршрута нет</string>
+    <string name="checker_native_route_default">Default-маршрут через %1$s</string>
+    <string name="checker_native_hooks_clean">/proc/self/maps: известных hook-маркеров нет</string>
+    <string name="checker_native_hook_marker">Hook-маркер в /proc/self/maps: %1$s</string>
+    <string name="checker_native_rwx_regions">/proc/self/maps: крупных RWX-регионов: %1$s</string>
+    <string name="checker_native_symbols_clean">Символы libc разрешаются корректно</string>
+    <string name="checker_native_symbol_missing">dlsym %1$s: не найден</string>
+    <string name="checker_native_symbol_foreign_library">dlsym %1$s указывает на чужую библиотеку: %2$s</string>
+
+    <!-- NativeSignsChecker: root detection -->
+    <string name="checker_native_root_clean">Root-индикаторы: признаков root-доступа не обнаружено</string>
+    <string name="checker_native_root_su_binary">Найден бинарник su: %1$s</string>
+    <string name="checker_native_root_property">Подозрительное системное свойство: %1$s</string>
+    <string name="checker_native_root_mgmt_artifact">Артефакт root-менеджера: %1$s</string>
+    <string name="checker_native_root_system_rw">Раздел /system доступен на запись</string>
+    <string name="checker_native_root_suspicious_mount">Подозрительная запись монтирования: %1$s</string>
+    <string name="checker_native_root_overlay_mount">Overlay-монтирование на системном разделе: %1$s</string>
+    <string name="checker_native_root_selinux_permissive">SELinux в режиме permissive</string>
+    <string name="checker_native_root_selinux_absent">Статус SELinux enforcement недоступен</string>
+    <string name="checker_native_root_uid">Процесс выполняется с root UID: %1$s</string>
+    <string name="checker_native_root_magisk_prop">Обнаружено свойство Magisk: %1$s</string>
+
+    <!-- App update checker -->
+    <string name="update_dialog_title">Доступно обновление</string>
+    <string name="update_dialog_message">Установленная версия: %1$s\nАктуальная версия: %2$s</string>
+    <string name="update_dialog_download">Скачать</string>
+    <string name="update_dialog_skip">Пропустить эту версию</string>
+    <string name="update_dialog_later">Потом</string>
+    <string name="auto_update_onboarding_title">Включить проверку обновлений?</string>
+    <string name="auto_update_onboarding_message">При первом запуске приложение может проверить GitHub Releases на наличие новой APK. Если сейчас отказаться, эта проверка не будет выполняться, пока вы вручную не включите её в настройках сети.</string>
+    <string name="auto_update_onboarding_enable">Включить</string>
+    <string name="auto_update_onboarding_disable">Не включать</string>
 </resources>

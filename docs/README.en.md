@@ -6,6 +6,23 @@ Android app for detecting VPNs and proxies on a device. Implements the Roskomnad
 
 Minimum Android version: 8.0 (API 26).
 
+## Community Help Wanted
+
+This project documents methods for detecting VPNs and proxies on Android devices. However, **the inverse problem** how to prevent the detection of an active VPN has been studied much less thoroughly.
+
+I am looking for people willing to help collect, organize, and test information about ways to bypass detection, including, but not limited to:
+
+- **Network interface masking** (how to hide `tun0`, `wg0`, and other VPN-like interfaces from `NetworkInterface.getNetworkInterfaces()` and `/proc/net/route`)
+- **NetworkCapabilities spoofing** (ways to remove `TRANSPORT_VPN`, `IS_VPN`, and `VpnTransportInfo` from `ConnectivityManager` responses)
+- **Hiding from dumpsys** (preventing information leakage through `dumpsys vpn_management` and `dumpsys activity services android.net.VpnService`)
+- **MTU normalization** (setting a standard MTU of 1500 for tunnel interfaces across different clients)
+- **DNS leaks** (preventing detection of loopback/private DNS while a VPN is active)
+- **Hiding localhost proxies** (how to prevent detection via `/proc/net/tcp` and port scanning)
+- **Bypassing native checks** (countering JNI-based checks through `/proc/self/maps`, `getifaddrs()`, and `dlsym`)
+- **Masking installed applications** (hiding VPN app packages from `PackageManager`)
+
+If you have expertise in these areas, please open an Issue or Pull Request describing the method, the conditions under which it applies, and its limitations. Any information is valuable, from theoretical ideas to working PoCs.
+
 ## Architecture
 
 Six independent check modules run in parallel. The final verdict is calculated in `VerdictEngine`.
@@ -18,8 +35,11 @@ VpnCheckRunner
 ├── IpComparisonChecker    — RU/non-RU IP checkers (diagnostics)
 ├── DirectSignsChecker     — NetworkCapabilities, system proxy, installed VPN apps
 ├── IndirectSignsChecker   — interfaces, routes, DNS, dumpsys, proxy-tech signals
+├── CallTransportChecker   — STUN/MTProto (leaks and connectivity)
+├── CdnPullingChecker      — HTTPS requests to CDN/redirector
 ├── LocationSignalsChecker — MCC/SIM/cell/Wi-Fi/BeaconDB
-└── BypassChecker          — localhost proxy, Xray gRPC API, underlying-network leak
+├── BypassChecker          — localhost proxy, Xray gRPC API, underlying-network leak
+└── NativeSignsChecker     — JNI checks (routes, hooks, root)
         └── VerdictEngine  — final verdict logic
 ```
 
@@ -331,6 +351,27 @@ Final category result:
 
 ---
 
+### 7. CDN Pulling (`CdnPullingChecker`)
+
+Sends HTTPS requests to known redirectors and trace endpoints (e.g., Google Video, Cloudflare trace, Meduza) to see what public IP or network metadata is exposed.
+
+### 8. Call Transport (`CallTransportChecker`)
+
+Checks UDP/STUN accessibility across global and regional endpoints, and tests TCP MTProto reachability via local proxies. This can reveal mapped public IPs or underlying leaks that bypass conventional tunnels.
+
+### 9. Native Signs (`NativeSignsChecker`)
+
+Performs low-level JNI checks directly from C++:
+- Native interface listing and `getifaddrs()` checks
+- Direct `/proc/net/route` parsing
+- `/proc/self/maps` scanning for known hook markers
+- `libc` symbol resolution integrity
+- Root detection (su binaries, magisk properties, selinux, rw /system, etc.)
+
+Native findings can translate into `needsReview` or generic indirect routing signals.
+
+---
+
 ## Verdict (`VerdictEngine`)
 
 `VerdictEngine` does not use all collected blocks equally.
@@ -362,7 +403,8 @@ Combinations:
 Notes:
 
 - `IpComparisonChecker` currently does not participate in `VerdictEngine`;
-- `INSTALLED_APP` and `VPN_SERVICE_DECLARATION` signals are also not part of the matrix and remain diagnostic.
+- `INSTALLED_APP` and `VPN_SERVICE_DECLARATION` signals are also not part of the matrix and remain diagnostic;
+- Actionable leaks from `CallTransportChecker` or review hits from `NativeSignsChecker` (e.g., hook markers) upgrade `NOT_DETECTED` to `NEEDS_REVIEW`.
 
 ---
 

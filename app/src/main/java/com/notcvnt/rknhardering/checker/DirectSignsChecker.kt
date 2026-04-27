@@ -7,7 +7,6 @@ import android.net.Proxy
 import android.net.ProxyInfo
 import android.os.Build
 import com.notcvnt.rknhardering.R
-import com.notcvnt.rknhardering.TunProbeDiagnosticsFormatter
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -80,7 +79,6 @@ object DirectSignsChecker {
         tunActiveProbeResult
             ?.takeIf { it.vpnActive }
             ?.let { result ->
-                addDebugTunProbeFinding(context, result, findings)
                 val tunActiveProbeOutcome = reportTunActiveProbe(context, result, findings, evidence)
                 detected = detected || tunActiveProbeOutcome.detected
                 needsReview = needsReview || tunActiveProbeOutcome.needsReview
@@ -643,108 +641,113 @@ object DirectSignsChecker {
         findings: MutableList<Finding>,
         evidence: MutableList<EvidenceItem>,
     ): SignalOutcome {
-        val comparison = result.vpnIpComparison
-        result.vpnIp?.let { vpnIp ->
-            val transportOnly = comparison?.usedCurlCompatibleFallback() == true &&
-                comparison.curlCompatible.transportDiagnostics.resolveStrategy != TunProbeResolveStrategy.KOTLIN_INJECTED
-            val description = context.getString(
-                when {
-                    transportOnly -> R.string.checker_bypass_tun_probe_success_transport_only
-                    comparison?.usedCurlCompatibleFallback() == true -> R.string.checker_bypass_tun_probe_success_curl_compatible
-                    else -> R.string.checker_bypass_tun_probe_success
-                },
-                vpnIp,
-            )
-            val confidence = if (transportOnly) EvidenceConfidence.MEDIUM else EvidenceConfidence.HIGH
+        val targets = listOfNotNull(
+            result.ruTarget.takeIf { it.vpnIp != null || it.error != null },
+            result.nonRuTarget.takeIf { it.vpnIp != null || it.error != null },
+        )
+        if (targets.isEmpty()) {
+            result.vpnError
+                ?.takeIf { it.isNotBlank() }
+                ?.let { vpnError ->
+                    findings.add(
+                        Finding(
+                            description = context.getString(R.string.checker_bypass_tun_probe_failure_reason, vpnError),
+                            needsReview = true,
+                            source = EvidenceSource.TUN_ACTIVE_PROBE,
+                            confidence = EvidenceConfidence.LOW,
+                        ),
+                    )
+                    return SignalOutcome(needsReview = true)
+                }
             findings.add(
                 Finding(
-                    description = description,
-                    detected = true,
+                    description = context.getString(R.string.checker_bypass_tun_probe_failure),
+                    isInformational = true,
                     source = EvidenceSource.TUN_ACTIVE_PROBE,
-                    confidence = confidence,
                 ),
             )
-            evidence.add(
-                EvidenceItem(
-                    source = EvidenceSource.TUN_ACTIVE_PROBE,
-                    detected = true,
-                    confidence = confidence,
-                    description = if (transportOnly) {
-                        "A curl-compatible transport-only request via VPN network returned public IP $vpnIp"
-                    } else {
-                        "A request via VPN network returned public IP $vpnIp"
-                    },
-                ),
-            )
-            val hasDnsPathMismatch = comparison?.dnsPathMismatch == true
-            if (hasDnsPathMismatch) {
-                findings.add(
-                    Finding(
-                        description = context.getString(
-                            if (transportOnly) {
-                                R.string.checker_bypass_tun_probe_dns_mismatch
-                            } else {
-                                R.string.checker_bypass_tun_probe_dns_mismatch_curl_compatible
-                            },
-                            comparison.strict.error ?: result.vpnError ?: "unknown error",
-                        ),
-                        needsReview = true,
-                        source = EvidenceSource.TUN_ACTIVE_PROBE,
-                        confidence = EvidenceConfidence.LOW,
-                    ),
-                )
-            }
-            return SignalOutcome(detected = true, needsReview = hasDnsPathMismatch)
+            return SignalOutcome()
         }
 
-        result.vpnError
-            ?.takeIf { it.isNotBlank() }
-            ?.let { vpnError ->
-                findings.add(
-                    Finding(
-                        description = context.getString(R.string.checker_bypass_tun_probe_failure_reason, vpnError),
-                        needsReview = true,
+        var detected = false
+        var needsReview = false
+
+        for (target in targets) {
+            val vpnIp = target.vpnIp
+            if (vpnIp == null) {
+                target.error?.takeIf { it.isNotBlank() }?.let { err ->
+                    findings.add(
+                        Finding(
+                            description = context.getString(
+                                R.string.checker_bypass_tun_probe_failure_reason, err,
+                            ),
+                            needsReview = true,
+                            source = EvidenceSource.TUN_ACTIVE_PROBE,
+                            confidence = EvidenceConfidence.LOW,
+                        ),
+                    )
+                    needsReview = true
+                }
+                continue
+            }
+            val comparison = target.comparison
+            findings.add(
+                Finding(
+                    description = context.getString(
+                        if (comparison?.usedCurlCompatibleFallback() == true) {
+                            R.string.checker_bypass_tun_probe_success_proxy_target
+                        } else {
+                            R.string.checker_bypass_tun_probe_success_direct_target
+                        },
+                        targetGroupLabel(context, target.targetGroup),
+                        vpnIp,
+                    ),
+                    isInformational = true,
+                    source = EvidenceSource.TUN_ACTIVE_PROBE,
+                ),
+            )
+
+            val hasDnsPathMismatch = comparison?.dnsPathMismatch == true
+            if (hasDnsPathMismatch) {
+                val transportOnly = comparison.usedCurlCompatibleFallback() &&
+                    comparison.curlCompatible.transportDiagnostics.resolveStrategy != TunProbeResolveStrategy.KOTLIN_INJECTED
+                val confidence = if (transportOnly) EvidenceConfidence.MEDIUM else EvidenceConfidence.HIGH
+                evidence.add(
+                    EvidenceItem(
                         source = EvidenceSource.TUN_ACTIVE_PROBE,
-                        confidence = EvidenceConfidence.LOW,
+                        detected = true,
+                        confidence = confidence,
+                        description = "DNS path mismatch on TUN probe (${target.targetGroup}): $vpnIp",
                     ),
                 )
-                return SignalOutcome(needsReview = true)
+                detected = true
+            } else {
+                evidence.add(
+                    EvidenceItem(
+                        source = EvidenceSource.TUN_ACTIVE_PROBE,
+                        detected = false,
+                        confidence = EvidenceConfidence.MEDIUM,
+                        description = "TUN probe returned $vpnIp (${target.targetGroup}); consensus will decide",
+                    ),
+                )
+                needsReview = true
             }
+        }
 
-        findings.add(
-            Finding(
-                description = context.getString(R.string.checker_bypass_tun_probe_failure),
-                isInformational = true,
-                source = EvidenceSource.TUN_ACTIVE_PROBE,
-            ),
-        )
-        return SignalOutcome()
-    }
-
-    private fun addDebugTunProbeFinding(
-        context: Context,
-        result: UnderlyingNetworkProber.ProbeResult,
-        findings: MutableList<Finding>,
-    ) {
-        val diagnostics = result.tunProbeDiagnostics ?: return
-        val vpnPath = diagnostics.vpnPath ?: return
-        findings.add(
-            Finding(
-                description = TunProbeDiagnosticsFormatter.formatUiSummary(
-                    context = context,
-                    pathLabel = context.getString(R.string.checker_tun_probe_path_vpn),
-                    modeOverride = diagnostics.modeOverride,
-                    path = vpnPath,
-                ),
-                isInformational = true,
-                source = EvidenceSource.TUN_ACTIVE_PROBE,
-            ),
-        )
+        return SignalOutcome(detected = detected, needsReview = needsReview)
     }
 
     internal fun isKnownProxyPort(port: String?): Boolean {
         val value = port?.toIntOrNull() ?: return false
         return value in KNOWN_PROXY_PORTS || KNOWN_PROXY_PORT_RANGES.any { value in it }
+    }
+
+    private fun targetGroupLabel(
+        context: Context,
+        targetGroup: com.notcvnt.rknhardering.model.TargetGroup,
+    ): String = when (targetGroup) {
+        com.notcvnt.rknhardering.model.TargetGroup.RU -> context.getString(R.string.ip_channels_target_ru)
+        com.notcvnt.rknhardering.model.TargetGroup.NON_RU -> context.getString(R.string.ip_channels_target_non_ru)
     }
 
     private fun Throwable.renderMessage(): String {

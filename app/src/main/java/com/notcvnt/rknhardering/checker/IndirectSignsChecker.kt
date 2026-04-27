@@ -99,9 +99,11 @@ object IndirectSignsChecker {
 
     internal data class CallTransportEvaluation(
         val results: List<CallTransportLeakResult> = emptyList(),
+        val stunGroups: List<com.notcvnt.rknhardering.model.StunProbeGroupResult> = emptyList(),
         val findings: List<Finding> = emptyList(),
         val evidence: List<EvidenceItem> = emptyList(),
         val needsReview: Boolean = false,
+        val diagnostics: CallTransportPerformanceDiagnostics? = null,
     )
 
     private val VPN_INTERFACE_PATTERNS = listOf(
@@ -116,6 +118,7 @@ object IndirectSignsChecker {
     private val STANDARD_INTERFACES = listOf(
         Regex("^wlan.*"),
         Regex("^rmnet.*"),
+        Regex("^seth.*"),   // LTE interface on select Qualcomm/MediaTek devices (e.g. seth_lte0)
         Regex("^eth.*"),
         Regex("^lo$"),
         Regex("^ccmni.*"),
@@ -152,14 +155,19 @@ object IndirectSignsChecker {
         callTransportProbeEnabled: Boolean = false,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
     ): CategoryResult {
+        val startedAtMs = IndirectCheckPerformanceSupport.monotonicNowMs()
+        val stepTimings = mutableListOf<DebugStepTiming>()
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
         val activeApps = mutableListOf<ActiveVpnApp>()
         val callTransportLeaks = mutableListOf<CallTransportLeakResult>()
+        val stunProbeGroups = mutableListOf<com.notcvnt.rknhardering.model.StunProbeGroupResult>()
         var detected = false
         var needsReview = false
 
-        val networkSnapshots = collectNetworkSnapshots(context)
+        val networkSnapshots = IndirectCheckPerformanceSupport.measureStep("collectNetworkSnapshots", stepTimings) {
+            collectNetworkSnapshots(context)
+        }
         val snapshotByInterface = buildSnapshotIndex(networkSnapshots)
 
         findings += networkSnapshots
@@ -170,51 +178,70 @@ object IndirectSignsChecker {
             }
             .flatten()
 
-        val notVpnOutcome = checkNotVpnCapability(context, findings, evidence)
+        val notVpnOutcome = IndirectCheckPerformanceSupport.measureStep("checkNotVpnCapability", stepTimings) {
+            checkNotVpnCapability(context, findings, evidence)
+        }
         detected = detected || notVpnOutcome.detected
         needsReview = needsReview || notVpnOutcome.needsReview
 
-        detected = checkNetworkInterfaces(context, findings, evidence, snapshotByInterface) || detected
-        detected = checkMtu(context, findings, evidence, snapshotByInterface) || detected
+        detected = IndirectCheckPerformanceSupport.measureStep("checkNetworkInterfaces", stepTimings) {
+            checkNetworkInterfaces(context, findings, evidence, snapshotByInterface)
+        } || detected
+        detected = IndirectCheckPerformanceSupport.measureStep("checkMtu", stepTimings) {
+            checkMtu(context, findings, evidence, snapshotByInterface)
+        } || detected
 
-        val routingOutcome = checkRoutingTable(context, networkSnapshots)
+        val routingOutcome = IndirectCheckPerformanceSupport.measureStep("checkRoutingTable", stepTimings) {
+            checkRoutingTable(context, networkSnapshots)
+        }
         findings += routingOutcome.findings
         evidence += routingOutcome.evidence
         detected = detected || routingOutcome.detected
         needsReview = needsReview || routingOutcome.needsReview
 
-        val dnsOutcome = checkDns(context, networkSnapshots)
+        val dnsOutcome = IndirectCheckPerformanceSupport.measureStep("checkDns", stepTimings) {
+            checkDns(context, networkSnapshots)
+        }
         findings += dnsOutcome.findings
         evidence += dnsOutcome.evidence
         detected = detected || dnsOutcome.detected
         needsReview = needsReview || dnsOutcome.needsReview
 
-        val proxyTechnicalOutcome = checkProxyTechnicalSignals(context)
+        val proxyTechnicalOutcome = IndirectCheckPerformanceSupport.measureStep("checkProxyTechnicalSignals", stepTimings) {
+            checkProxyTechnicalSignals(context)
+        }
         findings += proxyTechnicalOutcome.findings
         evidence += proxyTechnicalOutcome.evidence
         detected = detected || proxyTechnicalOutcome.detected
         needsReview = needsReview || proxyTechnicalOutcome.needsReview
 
-        val callTransportOutcome = checkCallTransportSignals(
-            context = context,
-            networkRequestsEnabled = networkRequestsEnabled,
-            callTransportProbeEnabled = callTransportProbeEnabled,
-            resolverConfig = resolverConfig,
-        )
+        val callTransportOutcome = IndirectCheckPerformanceSupport.measureSuspendStep("checkCallTransportSignals", stepTimings) {
+            checkCallTransportSignals(
+                context = context,
+                networkRequestsEnabled = networkRequestsEnabled,
+                callTransportProbeEnabled = callTransportProbeEnabled,
+                resolverConfig = resolverConfig,
+            )
+        }
         findings += callTransportOutcome.findings
         evidence += callTransportOutcome.evidence
         callTransportLeaks += callTransportOutcome.results
+        stunProbeGroups += callTransportOutcome.stunGroups
         needsReview = needsReview || callTransportOutcome.needsReview
 
-        val dumpsysVpnOutcome = checkDumpsysVpn(context, findings, evidence, activeApps)
+        val dumpsysVpnOutcome = IndirectCheckPerformanceSupport.measureStep("checkDumpsysVpn", stepTimings) {
+            checkDumpsysVpn(context, findings, evidence, activeApps)
+        }
         detected = detected || dumpsysVpnOutcome.detected
         needsReview = needsReview || dumpsysVpnOutcome.needsReview
 
-        val dumpsysServiceOutcome = checkDumpsysVpnService(context, findings, evidence, activeApps)
+        val dumpsysServiceOutcome = IndirectCheckPerformanceSupport.measureStep("checkDumpsysVpnService", stepTimings) {
+            checkDumpsysVpnService(context, findings, evidence, activeApps)
+        }
         detected = detected || dumpsysServiceOutcome.detected
         needsReview = needsReview || dumpsysServiceOutcome.needsReview
 
-        return CategoryResult(
+        val result = CategoryResult(
             name = context.getString(R.string.checker_indirect_category_name),
             detected = detected,
             findings = findings,
@@ -222,7 +249,17 @@ object IndirectSignsChecker {
             evidence = evidence,
             activeApps = activeApps.distinctBy { Triple(it.packageName, it.serviceName, it.source) },
             callTransportLeaks = callTransportLeaks,
+            stunProbeGroups = stunProbeGroups,
         )
+        IndirectCheckPerformanceRegistry.attach(
+            category = result,
+            diagnostics = IndirectCheckPerformanceDiagnostics(
+                totalDurationMs = IndirectCheckPerformanceSupport.elapsedSince(startedAtMs),
+                steps = stepTimings.toList(),
+                callTransport = callTransportOutcome.diagnostics,
+            ),
+        )
+        return result
     }
 
     private suspend fun checkCallTransportSignals(
@@ -242,9 +279,11 @@ object IndirectSignsChecker {
         )
         return CallTransportEvaluation(
             results = evaluation.results,
+            stunGroups = evaluation.stunGroups,
             findings = evaluation.findings,
             evidence = evaluation.evidence,
             needsReview = evaluation.needsReview,
+            diagnostics = evaluation.diagnostics,
         )
     }
 
@@ -1084,6 +1123,7 @@ object IndirectSignsChecker {
             }
 
             val records = VpnDumpsysParser.parseVpnManagement(output)
+                .filter { it.packageName != null || it.serviceName != null }
             if (records.isEmpty()) {
                 findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_vpn_none)))
                 return SignalOutcome()
@@ -1127,7 +1167,7 @@ object IndirectSignsChecker {
                 activeApps.add(
                     ActiveVpnApp(
                         packageName = record.packageName,
-                        serviceName = null,
+                        serviceName = record.serviceName,
                         family = signature?.family,
                         kind = signature?.kind,
                         source = EvidenceSource.ACTIVE_VPN,

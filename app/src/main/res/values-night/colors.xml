@@ -9,6 +9,7 @@
 
     <color name="md_surface">#FF17151B</color>
     <color name="md_surface_container">#FF24212A</color>
+    <color name="md_surface_container_high">#FF2C2932</color>
     <color name="md_on_surface">#FFE8E1EB</color>
     <color name="md_on_surface_variant">#FFCAC4D0</color>
     <color name="md_outline_variant">#FF4B4653</color>
@@ -19,6 +20,8 @@
     <color name="status_red_container">#FF5A1D1B</color>
     <color name="status_amber">#FFF1CC74</color>
     <color name="status_amber_container">#FF4B3900</color>
+    <color name="status_neutral">#FFB5B3BC</color>
+    <color name="status_neutral_container">#FF2E2C35</color>
 
     <color name="verdict_green">@color/status_green</color>
     <color name="verdict_green_bg">@color/status_green_container</color>

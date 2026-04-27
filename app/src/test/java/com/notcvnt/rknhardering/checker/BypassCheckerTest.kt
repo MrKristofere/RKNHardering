@@ -20,6 +20,8 @@ import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.TunProbeDiagnostics
 import com.notcvnt.rknhardering.probe.TunProbeModeOverride
+import com.notcvnt.rknhardering.model.TargetGroup
+import com.notcvnt.rknhardering.probe.PerTargetProbe
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -48,8 +50,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "198.51.100.10",
-                underlyingIp = "203.0.113.20",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "198.51.100.10", directIp = "203.0.113.20"),
                 activeNetworkIsVpn = false,
             ),
             findings = findings,
@@ -73,8 +74,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "198.51.100.10",
-                underlyingIp = "203.0.113.20",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "198.51.100.10", directIp = "203.0.113.20"),
                 activeNetworkIsVpn = true,
             ),
             findings = findings,
@@ -97,8 +97,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = false,
-                vpnIp = "198.51.100.10",
-                underlyingIp = null,
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "198.51.100.10"),
                 activeNetworkIsVpn = false,
             ),
             findings = findings,
@@ -127,8 +126,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = null,
-                underlyingIp = "203.0.113.20",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, directIp = "203.0.113.20"),
                 vpnError = "timeout",
                 activeNetworkIsVpn = true,
             ),
@@ -158,8 +156,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "2001:db8::10",
-                underlyingIp = "203.0.113.20",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "2001:db8::10", directIp = "203.0.113.20"),
                 activeNetworkIsVpn = true,
             ),
             findings = findings,
@@ -182,8 +179,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "128.71.10.5",
-                underlyingIp = "128.71.10.5",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "128.71.10.5", directIp = "128.71.10.5"),
                 activeNetworkIsVpn = true,
             ),
             findings = findings,
@@ -206,8 +202,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "203.0.113.10",
-                underlyingIp = "203.0.113.10",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "203.0.113.10", directIp = "203.0.113.10"),
                 activeNetworkIsVpn = false,
             ),
             findings = findings,
@@ -230,8 +225,7 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "2001:db8::10",
-                underlyingIp = "203.0.113.20",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "2001:db8::10", directIp = "203.0.113.20"),
                 activeNetworkIsVpn = false,
             ),
             findings = findings,
@@ -245,6 +239,39 @@ class BypassCheckerTest {
     }
 
     @Test
+    fun `gateway leak prefers non ru target when ru target masks the mismatch`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val outcome = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                ruTarget = PerTargetProbe(
+                    targetHost = "ipv4-internet.yandex.net",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "37.112.0.10",
+                    directIp = "37.112.0.10",
+                ),
+                nonRuTarget = PerTargetProbe(
+                    targetHost = "api-ipv4.ip.sb",
+                    targetGroup = TargetGroup.NON_RU,
+                    vpnIp = "37.112.0.10",
+                    directIp = "157.180.0.10",
+                ),
+                activeNetworkIsVpn = true,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertTrue(outcome.detected)
+        assertFalse(outcome.needsReview)
+        assertTrue(evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected })
+    }
+
+    @Test
     fun `gateway leak falls back to needs review when vpn comparison relies on curl compatible fallback`() {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
@@ -254,22 +281,26 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "198.51.100.10",
-                underlyingIp = "203.0.113.20",
-                vpnIpComparison = PublicIpNetworkComparison(
-                    strict = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
-                        status = PublicIpProbeStatus.FAILED,
-                        error = "strict timeout",
+                ruTarget = PerTargetProbe(
+                    targetHost = "",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "198.51.100.10",
+                    directIp = "203.0.113.20",
+                    comparison = PublicIpNetworkComparison(
+                        strict = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                            status = PublicIpProbeStatus.FAILED,
+                            error = "strict timeout",
+                        ),
+                        curlCompatible = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                            status = PublicIpProbeStatus.SUCCEEDED,
+                            ip = "198.51.100.10",
+                        ),
+                        selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        selectedIp = "198.51.100.10",
+                        dnsPathMismatch = true,
                     ),
-                    curlCompatible = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
-                        status = PublicIpProbeStatus.SUCCEEDED,
-                        ip = "198.51.100.10",
-                    ),
-                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
-                    selectedIp = "198.51.100.10",
-                    dnsPathMismatch = true,
                 ),
                 activeNetworkIsVpn = true,
                 tunProbeDiagnostics = TunProbeDiagnostics(
@@ -317,8 +348,8 @@ class BypassCheckerTest {
         assertFalse(evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected })
         assertTrue(findings.any { it.needsReview && it.source == EvidenceSource.VPN_GATEWAY_LEAK })
         assertTrue(findings.any { it.isInformational && it.description.contains("curl-compatible transport-only fallback") })
-        assertTrue(findings.any { it.isInformational && it.description.contains("VPN path debug") })
-        assertTrue(findings.any { it.isInformational && it.description.contains("underlying path debug") })
+        assertFalse(findings.any { it.isInformational && it.description.contains("VPN path debug") })
+        assertFalse(findings.any { it.isInformational && it.description.contains("underlying path debug") })
     }
 
     @Test
@@ -331,22 +362,26 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "203.0.113.10",
-                underlyingIp = "198.51.100.10",
-                vpnIpComparison = PublicIpNetworkComparison(
-                    strict = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
-                        status = PublicIpProbeStatus.FAILED,
-                        error = "strict timeout",
+                ruTarget = PerTargetProbe(
+                    targetHost = "",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "203.0.113.10",
+                    directIp = "198.51.100.10",
+                    comparison = PublicIpNetworkComparison(
+                        strict = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                            status = PublicIpProbeStatus.FAILED,
+                            error = "strict timeout",
+                        ),
+                        curlCompatible = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                            status = PublicIpProbeStatus.SUCCEEDED,
+                            ip = "203.0.113.10",
+                        ),
+                        selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        selectedIp = "203.0.113.10",
+                        dnsPathMismatch = true,
                     ),
-                    curlCompatible = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
-                        status = PublicIpProbeStatus.SUCCEEDED,
-                        ip = "203.0.113.10",
-                    ),
-                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
-                    selectedIp = "203.0.113.10",
-                    dnsPathMismatch = true,
                 ),
                 activeNetworkIsVpn = false,
             ),
@@ -371,22 +406,26 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "203.0.113.10",
-                underlyingIp = "203.0.113.10",
-                vpnIpComparison = PublicIpNetworkComparison(
-                    strict = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
-                        status = PublicIpProbeStatus.FAILED,
-                        error = "strict timeout",
+                ruTarget = PerTargetProbe(
+                    targetHost = "",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "203.0.113.10",
+                    directIp = "203.0.113.10",
+                    comparison = PublicIpNetworkComparison(
+                        strict = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                            status = PublicIpProbeStatus.FAILED,
+                            error = "strict timeout",
+                        ),
+                        curlCompatible = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                            status = PublicIpProbeStatus.SUCCEEDED,
+                            ip = "203.0.113.10",
+                        ),
+                        selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        selectedIp = "203.0.113.10",
+                        dnsPathMismatch = true,
                     ),
-                    curlCompatible = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
-                        status = PublicIpProbeStatus.SUCCEEDED,
-                        ip = "203.0.113.10",
-                    ),
-                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
-                    selectedIp = "203.0.113.10",
-                    dnsPathMismatch = true,
                 ),
                 activeNetworkIsVpn = false,
             ),
@@ -410,21 +449,25 @@ class BypassCheckerTest {
             result = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = true,
-                vpnIp = "198.51.100.10",
-                underlyingIp = "203.0.113.20",
-                vpnIpComparison = PublicIpNetworkComparison(
-                    strict = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
-                        status = PublicIpProbeStatus.SKIPPED,
-                        error = "Disabled by override",
+                ruTarget = PerTargetProbe(
+                    targetHost = "",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "198.51.100.10",
+                    directIp = "203.0.113.20",
+                    comparison = PublicIpNetworkComparison(
+                        strict = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                            status = PublicIpProbeStatus.SKIPPED,
+                            error = "Disabled by override",
+                        ),
+                        curlCompatible = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                            status = PublicIpProbeStatus.SUCCEEDED,
+                            ip = "198.51.100.10",
+                        ),
+                        selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        selectedIp = "198.51.100.10",
                     ),
-                    curlCompatible = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
-                        status = PublicIpProbeStatus.SUCCEEDED,
-                        ip = "198.51.100.10",
-                    ),
-                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
-                    selectedIp = "198.51.100.10",
                 ),
                 activeNetworkIsVpn = true,
             ),
@@ -555,7 +598,7 @@ class BypassCheckerTest {
         )
 
         assertFalse(evaluation.confirmedBypass)
-        assertEquals(listOf(2080, 39365), mtProtoPorts)
+        assertEquals(setOf(2080, 39365), mtProtoPorts.toSet())
         assertEquals(2, evaluation.proxyChecks.size)
         assertTrue(evaluation.proxyChecks.all { it.status == LocalProxyCheckStatus.PROXY_IP_UNAVAILABLE })
         assertEquals(LocalProxySummaryReason.FIRST_DISCOVERED, evaluation.proxyChecks[0].summaryReason)

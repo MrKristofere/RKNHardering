@@ -2,11 +2,14 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.GeoIpFacts
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +21,7 @@ import org.json.JSONObject
 
 object GeoIpChecker {
 
-    private const val MAX_FETCH_ATTEMPTS = 3
+    private const val MAX_FETCH_ATTEMPTS = 1
     private const val RETRY_DELAY_MS = 250L
     private const val GEOIP_TIMEOUT_MS = 10_000
 
@@ -52,6 +55,7 @@ object GeoIpChecker {
         context: Context,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
     ): CategoryResult = withContext(Dispatchers.IO) {
+        val executionContext = ScanExecutionContext.currentOrDefault()
         try {
             coroutineScope {
                 val ipapiIsDeferred = async { fetchWithRetries { fetchIpapiIs(resolverConfig) } }
@@ -75,6 +79,7 @@ object GeoIpChecker {
                 )
             }
         } catch (e: Exception) {
+            rethrowIfCancellation(e, executionContext)
             errorResult(context.getString(R.string.checker_geo_error_fetch, e.message))
         }
     }
@@ -90,7 +95,8 @@ object GeoIpChecker {
                 if (result != null) {
                     return result
                 }
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error)
                 // Ignore transient provider errors and retry the next attempt.
             }
             if (attempt < maxAttempts - 1 && retryDelayMs > 0) {
@@ -147,7 +153,8 @@ object GeoIpChecker {
                     hostingSources = emptyList(),
                 ),
             )
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            rethrowIfCancellation(error)
             null
         }
     }
@@ -193,17 +200,20 @@ object GeoIpChecker {
                     hostingSources = emptyList(),
                 ),
             )
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            rethrowIfCancellation(error)
             null
         }
     }
 
     private fun fetchJson(url: String, resolverConfig: DnsResolverConfig): JSONObject {
+        val executionContext = ScanExecutionContext.currentOrDefault()
         val response = ResolverNetworkStack.execute(
             url = url,
             method = "GET",
             timeoutMs = GEOIP_TIMEOUT_MS,
             config = resolverConfig,
+            cancellationSignal = executionContext.cancellationSignal,
         )
         if (response.code !in 200..299) {
             throw IllegalStateException("HTTP ${response.code}")
@@ -304,12 +314,24 @@ object GeoIpChecker {
             detected = snapshot.isProxy,
         )
 
+        val countryCode = snapshot.countryCode.uppercase().ifBlank { null }
+        val outsideRu = countryCode != null && countryCode != "RU"
+        val geoFacts = GeoIpFacts(
+            ip = snapshot.ip.takeUnless { it.isBlank() || it == "N/A" },
+            countryCode = countryCode,
+            asn = snapshot.asn.takeUnless { it.isBlank() || it == "N/A" },
+            outsideRu = outsideRu,
+            hosting = snapshot.isHosting,
+            proxyDb = snapshot.isProxy,
+            fetchError = false,
+        )
         return CategoryResult(
             name = "GeoIP",
             detected = snapshot.isHosting || snapshot.isProxy,
             findings = findings,
             needsReview = needsReview,
             evidence = evidence,
+            geoFacts = geoFacts,
         )
     }
 
@@ -318,6 +340,7 @@ object GeoIpChecker {
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(message, isError = true)),
+            geoFacts = GeoIpFacts(fetchError = true),
         )
     }
 
@@ -325,8 +348,8 @@ object GeoIpChecker {
         return CategoryResult(
             name = "GeoIP",
             detected = false,
-            needsReview = true,
-            findings = listOf(Finding(message, needsReview = true)),
+            findings = listOf(Finding(message)),
+            geoFacts = GeoIpFacts(fetchError = true),
         )
     }
 

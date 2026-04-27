@@ -4,6 +4,16 @@ import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.TunProbeDiagnostics
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 
+data class GeoIpFacts(
+    val ip: String? = null,
+    val countryCode: String? = null,
+    val asn: String? = null,
+    val outsideRu: Boolean = false,
+    val hosting: Boolean = false,
+    val proxyDb: Boolean = false,
+    val fetchError: Boolean = false,
+)
+
 enum class EvidenceConfidence {
     LOW,
     MEDIUM,
@@ -14,6 +24,7 @@ enum class EvidenceSource {
     GEO_IP,
     DIRECT_NETWORK_CAPABILITIES,
     INDIRECT_NETWORK_CAPABILITIES,
+    ICMP_SPOOFING,
     SYSTEM_PROXY,
     INSTALLED_APP,
     VPN_SERVICE_DECLARATION,
@@ -32,6 +43,45 @@ enum class EvidenceSource {
     TUN_ACTIVE_PROBE,
     TELEGRAM_CALL_TRANSPORT,
     WHATSAPP_CALL_TRANSPORT,
+    STUN_PROBE,
+    NATIVE_INTERFACE,
+    NATIVE_ROUTE,
+    NATIVE_SOCKET,
+    NATIVE_HOOK_MARKERS,
+    NATIVE_JVM_MISMATCH,
+    NATIVE_LIBRARY_INTEGRITY,
+    NATIVE_ROOT_DETECTION,
+}
+
+enum class StunScope {
+    RU,
+    GLOBAL,
+}
+
+data class StunProbeResult(
+    val host: String,
+    val port: Int,
+    val scope: StunScope,
+    val mappedIpv4: String? = null,
+    val mappedIpv6: String? = null,
+    val error: String? = null,
+) {
+    val hasResponse: Boolean get() = mappedIpv4 != null || mappedIpv6 != null
+    val mappedIpDisplay: String?
+        get() = when {
+            mappedIpv4 != null && mappedIpv6 != null -> "$mappedIpv4 / $mappedIpv6"
+            mappedIpv4 != null -> mappedIpv4
+            mappedIpv6 != null -> mappedIpv6
+            else -> null
+        }
+}
+
+data class StunProbeGroupResult(
+    val scope: StunScope,
+    val results: List<StunProbeResult>,
+) {
+    val respondedCount: Int get() = results.count { it.hasResponse }
+    val totalCount: Int get() = results.size
 }
 
 enum class CallTransportService {
@@ -166,6 +216,8 @@ data class CategoryResult(
     val matchedApps: List<MatchedVpnApp> = emptyList(),
     val activeApps: List<ActiveVpnApp> = emptyList(),
     val callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
+    val stunProbeGroups: List<StunProbeGroupResult> = emptyList(),
+    val geoFacts: GeoIpFacts? = null,
 ) {
     val hasError: Boolean
         get() = findings.any { it.isError }
@@ -231,6 +283,11 @@ data class CdnPullingResponse(
     val targetLabel: String,
     val url: String,
     val ip: String? = null,
+    val ipv4: String? = null,
+    val ipv6: String? = null,
+    val ipv4Unavailable: Boolean = false,
+    val ipv4Error: String? = null,
+    val ipv6Error: String? = null,
     val importantFields: Map<String, String> = emptyMap(),
     val rawBody: String? = null,
     val error: String? = null,
@@ -266,4 +323,15 @@ data class CheckResult(
     val bypassResult: BypassResult,
     val verdict: Verdict,
     val tunProbeDiagnostics: TunProbeDiagnostics? = null,
+    val nativeSigns: CategoryResult = CategoryResult(
+        name = "",
+        detected = false,
+        findings = emptyList(),
+    ),
+    val icmpSpoofing: CategoryResult = CategoryResult(
+        name = "",
+        detected = false,
+        findings = emptyList(),
+    ),
+    val ipConsensus: IpConsensusResult = IpConsensusResult.empty(),
 )
