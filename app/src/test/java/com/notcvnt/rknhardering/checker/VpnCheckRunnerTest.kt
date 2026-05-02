@@ -458,9 +458,25 @@ class VpnCheckRunnerTest {
     fun `run survives geoIpCheck throwing and produces partial result`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> throw java.io.IOException("boom") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _ -> category("icmp") },
+            directCheck = { _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
         )
         try {
-            val result = VpnCheckRunner.run(context, settings = CheckSettings(networkRequestsEnabled = true))
+            val result = VpnCheckRunner.run(
+                context,
+                settings = CheckSettings(
+                    splitTunnelEnabled = false,
+                    networkRequestsEnabled = true,
+                    resolverConfig = DnsResolverConfig.system(),
+                ),
+            )
             assertNotNull(result)
             assertTrue(result.geoIp.hasError)
         } finally {
@@ -472,11 +488,27 @@ class VpnCheckRunnerTest {
     fun `run propagates cancellation from geoIpCheck`(): Unit = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> throw kotlinx.coroutines.CancellationException("stop") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _ -> category("icmp") },
+            directCheck = { _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
         )
         try {
             var threw = false
             try {
-                VpnCheckRunner.run(context)
+                VpnCheckRunner.run(
+                    context,
+                    settings = CheckSettings(
+                        splitTunnelEnabled = false,
+                        networkRequestsEnabled = true,
+                        resolverConfig = DnsResolverConfig.system(),
+                    ),
+                )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 threw = true
             }
@@ -489,7 +521,13 @@ class VpnCheckRunnerTest {
     @Test
     fun `run forwards ipConsensus into check result`() = runBlocking {
         // default dependencies + empty settings should still produce an ipConsensus (even if empty)
-        val result = VpnCheckRunner.run(context, settings = CheckSettings(networkRequestsEnabled = false))
+        val result = VpnCheckRunner.run(
+            context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = false,
+            ),
+        )
         assertNotNull(result.ipConsensus)
     }
 

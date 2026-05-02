@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.IOException
 import java.net.InetAddress
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.system.measureTimeMillis
@@ -31,7 +32,7 @@ class IfconfigClientTest {
 
     @Test
     fun `fetch ip via network uses primary and fallback bindings`() {
-        val events = mutableListOf<String>()
+        val events = CopyOnWriteArrayList<String>()
         PublicIpClient.fetchIpOverride = { _, _, _, _, binding ->
             events += "strict:${binding?.javaClass?.simpleName}"
             when (binding) {
@@ -293,7 +294,7 @@ class IfconfigClientTest {
 
     @Test
     fun `strict override skips curl compatible branch`() {
-        val observedBindings = mutableListOf<ResolverBinding?>()
+        val observedBindings = CopyOnWriteArrayList<ResolverBinding?>()
         PublicIpClient.fetchIpOverride = { _, _, _, _, binding ->
             observedBindings += binding
             when (binding) {
@@ -323,7 +324,7 @@ class IfconfigClientTest {
 
     @Test
     fun `curl compatible override skips strict branch`() {
-        val strictCalls = mutableListOf<ResolverBinding?>()
+        val strictCalls = CopyOnWriteArrayList<ResolverBinding?>()
         PublicIpClient.fetchIpOverride = { _, _, _, _, binding ->
             strictCalls += binding
             when (binding) {
@@ -406,7 +407,7 @@ class IfconfigClientTest {
 
     @Test
     fun `network comparison uses exact target url for strict and curl compatible probes`() {
-        val requestedEndpoints = mutableListOf<String>()
+        val requestedEndpoints = CopyOnWriteArrayList<String>()
         PublicIpClient.fetchIpOverride = { endpoint, _, _, _, binding ->
             requestedEndpoints += "strict:$endpoint:${binding?.javaClass?.simpleName}"
             when (binding) {
@@ -447,7 +448,7 @@ class IfconfigClientTest {
 
     @Test
     fun `network comparison falls back to next custom target url`() {
-        val strictEndpoints = mutableListOf<String>()
+        val strictEndpoints = CopyOnWriteArrayList<String>()
         PublicIpClient.fetchIpOverride = { endpoint, _, _, _, binding ->
             strictEndpoints += endpoint
             when {

@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">RKNHardering</string>
     <string name="github_repo_url">https://github.com/xtclovver/RKNHardering</string>
+    <string name="matrix_room_url">https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech</string>
     <string name="run_check_notice">执行检查时，应用会向以下域名发起网络请求：\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ip.mail.ru\n• api4.ipify.org\n• api6.ipify.org\n• 2ip.ru\n• ipv4-internet.yandex.net\n• ipv6-internet.yandex.net\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\n如果在设置中选择了自定义 DNS resolver，应用还会连接到其 IP 地址或 DoH 域名。\n\n如果启用了 CDN pulling，应用还会向 redirector.googlevideo.com、rutracker.org 和 meduza.io 发送 HTTPS 请求，以查看这些端点会返回什么公网 IP 和 trace 数据。\n\n如果启用了 call transport 泄露检查，应用还会向内置的 Telegram 目标发送 UDP/STUN 请求。WhatsApp 目标只会在 debug 或 experimental build 中使用。\n\n如果启用了 Debug diagnostics，应用还可以基于最近一次已完成的检查生成可复制的诊断报告，即使这次检查成功完成也一样。该报告只保存在内存中，直到你复制它，并且也会包含 CDN pulling 的响应。\n\n点击“运行检查”即表示你同意这些网络请求将从你的设备发出。\n\n应用不会记录这些请求的日志。可以在应用设置中关闭网络访问。</string>
 
     <string name="settings_title">设置</string>
@@ -21,6 +22,8 @@
     <string name="settings_cat_privacy_desc">IP 遮蔽</string>
     <string name="settings_cat_appearance">外观</string>
     <string name="settings_cat_appearance_desc">主题与语言</string>
+    <string name="settings_cat_accessibility">无障碍</string>
+    <string name="settings_cat_accessibility_desc">色觉</string>
     <string name="settings_cat_about">关于</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">调试</string>
@@ -91,9 +94,18 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">色觉模式</string>
+    <string name="settings_color_vision_preview">状态预览</string>
+    <string name="settings_color_vision_off">关闭</string>
+    <string name="settings_color_vision_red_green">红绿色</string>
+    <string name="settings_color_vision_blue_yellow">蓝黄色</string>
+    <string name="settings_color_vision_achromatopsia">Achromatopsia</string>
+    <string name="settings_accessibility_status_preview_content">状态：%1$s</string>
     <string name="settings_permissions">权限</string>
     <string name="settings_permissions_desc">管理应用权限</string>
     <string name="settings_github">GitHub</string>
+    <string name="settings_matrix">Matrix</string>
+    <string name="settings_matrix_desc">RKN_Hardering:matrix.kangel.tech</string>
     <string name="main_copy_diagnostics">复制诊断</string>
     <string name="main_diagnostics_copied">诊断已复制</string>
     <string name="main_export">导出</string>
@@ -448,6 +460,7 @@
     <string name="checker_bypass_proxy_ip">经代理的 IP：%1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass：已确认（IP 不同）</string>
     <string name="checker_bypass_split_disabled">Per-app split 已关闭：IP 相同</string>
+    <string name="checker_bypass_auth_required">代理需要身份验证：绕过状态未确认</string>
     <string name="checker_bypass_mtproto_reachable">MTProto 代理：Telegram DC 可通过 %1$s -&gt; %2$s 访问</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe：Telegram DC 无法通过代理访问</string>
     <string name="checker_bypass_no_open_proxy">localhost 上的开放代理：未发现</string>
@@ -492,6 +505,7 @@
 
     <string name="checker_vpn_known_apps_none">已知 VPN/代理应用和 VpnService 提供方：未发现</string>
     <string name="checker_vpn_installed_app">已安装应用：%1$s（%2$s）</string>
+    <string name="checker_vpn_installed_app_by_name">名称中带有“VPN”的已安装应用：%1$s（%2$s）</string>
     <string name="checker_vpn_declares_service">应用声明了 VpnService：%1$s（%2$s）</string>
 
     <!-- Redesign: main screen -->
@@ -514,6 +528,7 @@
     <string name="tile_hint_detected_count">%1$d / %2$d 已检测</string>
     <string name="tile_hint_review">需要核查</string>
     <string name="tile_hint_error">错误</string>
+    <string name="settings_status_no_data">无数据</string>
     <string name="settings_value_on">开启</string>
     <string name="settings_value_off">关闭</string>
     <string name="settings_value_network_all">所有请求</string>

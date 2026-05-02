@@ -2,9 +2,28 @@
 
 # RKNHardering
 
+<a href="https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech"><img src="https://img.shields.io/badge/matrix-%23000000?style=for-the-badge&logo=matrix&logoColor=white" alt="Matrix" width="200"></a>
+
 برنامه Android برای شناسایی VPN و proxy روی دستگاه. این پروژه روش مبتنی بر منطق روس‌کومنادزور برای تشخیص ابزارهای دور زدن مسدودسازی را پیاده‌سازی می‌کند.
 
 حداقل نسخه Android: 8.0 (API 26).
+
+## به کمک جامعه نیاز داریم / Community Help Wanted
+
+این پروژه روش‌های شناسایی VPN و proxy روی دستگاه‌های Android را مستند می‌کند. با این حال، **مسئله معکوس** — یعنی چگونه از شناسایی VPN فعال جلوگیری کنیم — بسیار کمتر بررسی شده است.
+
+من به دنبال افرادی هستم که مایل به جمع‌آوری، سازمان‌دهی و آزمایش اطلاعات درباره روش‌های دور زدن شناسایی باشند، شامل اما نه محدود به:
+
+- **پنهان‌سازی اینترفیس‌های شبکه** (چگونه `tun0`، `wg0` و دیگر اینترفیس‌های شبیه VPN را از `NetworkInterface.getNetworkInterfaces()` و `/proc/net/route` مخفی کنیم)
+- **جعل NetworkCapabilities** (روش‌های حذف `TRANSPORT_VPN`، `IS_VPN` و `VpnTransportInfo` از پاسخ‌های `ConnectivityManager`)
+- **پنهان‌سازی از dumpsys** (جلوگیری از نشت اطلاعات از طریق `dumpsys vpn_management` و `dumpsys activity services android.net.VpnService`)
+- **نرمال‌سازی MTU** (تنظیم MTU استاندارد 1500 برای اینترفیس‌های تانلی در کلاینت‌های مختلف)
+- **نشتی‌های DNS** (جلوگیری از شناسایی loopback/private DNS هنگام فعال بودن VPN)
+- **پنهان‌سازی proxyهای localhost** (چگونه از شناسایی از طریق `/proc/net/tcp` و اسکن پورت جلوگیری کنیم)
+- **دور زدن بررسی‌های بومی/native** (مقابله با بررسی‌های مبتنی بر JNI از طریق `/proc/self/maps`، `getifaddrs()` و `dlsym`)
+- **پنهان‌سازی برنامه‌های نصب‌شده** (مخفی کردن بسته‌های برنامه VPN از `PackageManager`)
+
+اگر در این زمینه‌ها تخصص دارید، لطفاً یک Issue یا Pull Request باز کنید، یا در [چت Matrix](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech) روش خود را همراه با شرایط کاربرد و محدودیت‌های آن شرح دهید. هر اطلاعاتی ارزشمند است — از ایده‌های تئوری تا PoCهای کاربردی.
 
 ## معماری
 
@@ -117,7 +136,7 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 - امضاهای شناخته‌شده package از [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt)؛
 - برنامه‌هایی که از طریق `PackageManager.queryIntentServices`، رابط `VpnService.SERVICE_INTERFACE` را اعلان می‌کنند.
-
+- برنامه در نام خود «VPN» دارد (البته این ۱۰۰٪ تضمین نمی‌کند که VPN باشد)
 این‌ها سیگنال‌های تشخیصی نصب برنامه یا اعلان `VpnService` هستند، نه تأیید یک تونل فعال. تطبیق‌ها دسته را به `needsReview` می‌برند، اما به‌تنهایی باعث `DirectSignsChecker.detected = true` نمی‌شوند.
 
 ---

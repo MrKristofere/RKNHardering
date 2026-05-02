@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
 
 object IfconfigClient {
     private const val CURL_COMPATIBLE_UNAVAILABLE_MESSAGE =
@@ -319,7 +320,7 @@ object IfconfigClient {
                 executionContext = executionContext,
             )
         }
-        val endpointAttempts = if (collectTrace) mutableListOf<TunEndpointAttempt>() else null
+        val endpointAttempts = if (collectTrace) CopyOnWriteArrayList<TunEndpointAttempt>() else null
         val result = fetchIpForBinding(
             timeoutMs = timeoutMs,
             resolverConfig = resolverConfig,
@@ -349,14 +350,14 @@ object IfconfigClient {
                 mode = mode,
                 status = PublicIpProbeStatus.SUCCEEDED,
                 ip = result.getOrNull(),
-                endpointAttempts = endpointAttempts.orEmpty(),
+                endpointAttempts = endpointAttempts?.toList().orEmpty(),
             )
         } else {
             PublicIpModeProbeResult(
                 mode = mode,
                 status = PublicIpProbeStatus.FAILED,
                 error = result.exceptionOrNull().renderMessage(),
-                endpointAttempts = endpointAttempts.orEmpty(),
+                endpointAttempts = endpointAttempts?.toList().orEmpty(),
             )
         }
     }

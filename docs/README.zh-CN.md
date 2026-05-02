@@ -2,9 +2,28 @@
 
 # RKNHardering
 
+<a href="https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech"><img src="https://img.shields.io/badge/matrix-%23000000?style=for-the-badge&logo=matrix&logoColor=white" alt="Matrix" width="200"></a>
+
 用于检测设备上 VPN 和代理的 Android 应用。该项目实现了一套类似 Roskomnadzor 的封锁绕过工具识别方法。
 
 最低 Android 版本：8.0（API 26）。
+
+## 需要社区帮助 / Community Help Wanted
+
+本项目记录了在 Android 设备上检测 VPN 和代理的方法。然而，**反向问题**——如何防止 VPN 被检测到——的研究还远不够充分。
+
+我正在寻找愿意帮忙收集、整理和测试绕过检测方法的人，包括但不限于：
+
+- **隐藏网络接口**（如何让 `NetworkInterface.getNetworkInterfaces()` 和 `/proc/net/route` 无法看到 `tun0`、`wg0` 等类 VPN 接口）
+- **伪造 NetworkCapabilities**（从 `ConnectivityManager` 的响应中移除 `TRANSPORT_VPN`、`IS_VPN`、`VpnTransportInfo`）
+- **隐藏 dumpsys 信息**（防止通过 `dumpsys vpn_management` 和 `dumpsys activity services android.net.VpnService` 泄露信息）
+- **MTU 标准化**（在不同客户端上将隧道接口的 MTU 设置为标准的 1500）
+- **DNS 泄漏**（防止在 VPN 激活时检测到 loopback/private DNS）
+- **隐藏 localhost 代理**（如何防止通过 `/proc/net/tcp` 和端口扫描被发现）
+- **绕过原生检查**（对抗通过 `/proc/self/maps`、`getifaddrs()`、`dlsym` 进行的 JNI 检查）
+- **隐藏已安装的应用**（对 `PackageManager` 隐藏 VPN 应用的包名）
+
+如果你在这些领域有专业知识，请提交 Issue 或 Pull Request，或在 [Matrix 聊天室](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech)中描述方法、适用条件和限制。任何信息都很有价值——从理论想法到可用的 PoC。
 
 ## 架构
 
@@ -117,7 +136,7 @@ API：`ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 - [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt) 中的已知包名签名；
 - 通过 `PackageManager.queryIntentServices` 声明了 `VpnService.SERVICE_INTERFACE` 的应用。
-
+- 该应用程序名称中包含“VPN”（当然，这并不能100%保证它就是VPN）。
 这些只是安装状态或 `VpnService` 声明的诊断信号，并不表示活动隧道已被确认。匹配结果会将该类别标记为 `needsReview`，但不会单独让 `DirectSignsChecker.detected = true`。
 
 ---

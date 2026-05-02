@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">RKNHardering</string>
     <string name="github_repo_url">https://github.com/xtclovver/RKNHardering</string>
+    <string name="matrix_room_url">https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech</string>
     <string name="run_check_notice">During a check, the app will make network requests to these domains:\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ip.mail.ru\n• api4.ipify.org\n• api6.ipify.org\n• 2ip.ru\n• ipv4-internet.yandex.net\n• ipv6-internet.yandex.net\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\nIf a custom DNS resolver is selected in settings, the app will also connect to its IP addresses or DoH domain.\n\nIf CDN pulling is enabled, the app may additionally send HTTPS requests to redirector.googlevideo.com, rutracker.org, and meduza.io to see what public IP and trace data these endpoints return.\n\nIf Call transport leak probe is enabled, the app may additionally send UDP/STUN requests to bundled Telegram targets. WhatsApp targets are used only in debug or experimental builds.\n\nIf ICMP spoofing detection is enabled, the app may additionally resolve and ping instagram.com and google.com to compare blocked-host reachability and suspiciously low RTT values.\n\nIf Debug diagnostics is enabled, the app can also prepare a copyable diagnostics report from the last completed scan, even when the scan finished successfully. That report is kept only in memory until you copy it. CDN pulling responses are included in that report.\n\nBy tapping "Run check", you agree that these network requests will be made from your device.\n\nThe app does not keep logs of these requests. Network access can be disabled in the app settings.</string>
-
     <string name="settings_title">Settings</string>
     <string name="settings_section_checks">Checks</string>
     <string name="settings_section_privacy">Privacy</string>
@@ -21,6 +21,8 @@
     <string name="settings_cat_privacy_desc">IP masking</string>
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_appearance_desc">Theme &amp; language</string>
+    <string name="settings_cat_accessibility">Accessibility</string>
+    <string name="settings_cat_accessibility_desc">Color vision</string>
     <string name="settings_cat_about">About</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">Debug</string>
@@ -91,6 +93,13 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">Color vision mode</string>
+    <string name="settings_color_vision_preview">Status preview</string>
+    <string name="settings_color_vision_off">Off</string>
+    <string name="settings_color_vision_red_green">Red-green</string>
+    <string name="settings_color_vision_blue_yellow">Blue-yellow</string>
+    <string name="settings_color_vision_achromatopsia">Achromatopsia</string>
+    <string name="settings_accessibility_status_preview_content">%1$s status</string>
     <string name="settings_permissions">Permissions</string>
     <string name="settings_permissions_desc">Manage app permissions</string>
     <string name="settings_github">GitHub</string>
@@ -106,6 +115,8 @@
     <string name="main_export_saved">Export saved</string>
     <string name="main_export_failed">Failed to save export</string>
     <string name="settings_github_desc">xtclovver/RKNHardering</string>
+    <string name="settings_matrix">Matrix</string>
+    <string name="settings_matrix_desc">RKN_Hardering:matrix.kangel.tech</string>
     <string name="settings_port_range_from">From</string>
     <string name="settings_port_range_to">To</string>
 
@@ -450,6 +461,7 @@
     <string name="checker_bypass_proxy_ip">IP via proxy: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: confirmed (IPs differ)</string>
     <string name="checker_bypass_split_disabled">Per-app split is disabled: IPs match</string>
+    <string name="checker_bypass_auth_required">Proxy requires authentication: bypass status unconfirmed</string>
     <string name="checker_bypass_mtproto_reachable">MTProto proxy: Telegram DC is reachable via %1$s -&gt; %2$s</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe: Telegram DC is unreachable via proxy</string>
     <string name="checker_bypass_no_open_proxy">Open proxies on localhost: none detected</string>
@@ -496,6 +508,7 @@
     <!-- InstalledVpnAppDetector -->
     <string name="checker_vpn_known_apps_none">Known VPN/Proxy apps and VpnService providers: none detected</string>
     <string name="checker_vpn_installed_app">Installed app: %1$s (%2$s)</string>
+    <string name="checker_vpn_installed_app_by_name">Installed app with "VPN" in name: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">App declares VpnService: %1$s (%2$s)</string>
 
     <!-- Redesign: main screen -->
@@ -518,6 +531,7 @@
     <string name="tile_hint_detected_count">%1$d of %2$d detected</string>
     <string name="tile_hint_review">Needs review</string>
     <string name="tile_hint_error">Error</string>
+    <string name="settings_status_no_data">No data</string>
     <string name="settings_value_on">On</string>
     <string name="settings_value_off">Off</string>
     <string name="settings_value_network_all">All requests</string>

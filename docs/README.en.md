@@ -2,6 +2,8 @@
 
 # RKNHardering
 
+<a href="https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech"><img src="https://img.shields.io/badge/matrix-%23000000?style=for-the-badge&logo=matrix&logoColor=white" alt="Matrix" width="200"></a>
+
 Android app for detecting VPNs and proxies on a device. Implements the Roskomnadzor-style methodology for identifying censorship circumvention tools.
 
 Minimum Android version: 8.0 (API 26).
@@ -21,7 +23,7 @@ I am looking for people willing to help collect, organize, and test information 
 - **Bypassing native checks** (countering JNI-based checks through `/proc/self/maps`, `getifaddrs()`, and `dlsym`)
 - **Masking installed applications** (hiding VPN app packages from `PackageManager`)
 
-If you have expertise in these areas, please open an Issue or Pull Request describing the method, the conditions under which it applies, and its limitations. Any information is valuable, from theoretical ideas to working PoCs.
+If you have expertise in these areas, please open an Issue or Pull Request, or reach out in the [Matrix chat](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech) describing the method, the conditions under which it applies, and its limitations. Any information is valuable, from theoretical ideas to working PoCs.
 
 ## Architecture
 
@@ -134,7 +136,7 @@ The module checks two sources:
 
 - known package signatures from [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt);
 - apps that declare `VpnService.SERVICE_INTERFACE` through `PackageManager.queryIntentServices`.
-
+- the app has "VPN" in the name (this, of course, doesn't 100% guarantee that it's a VPN)
 These are diagnostic signals of installation or `VpnService` declaration, not confirmation of an active tunnel. Matches move the category into `needsReview`, but do not by themselves make `DirectSignsChecker.detected = true`.
 
 ---

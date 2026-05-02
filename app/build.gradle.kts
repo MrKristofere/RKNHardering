@@ -2,6 +2,7 @@ import org.gradle.api.GradleException
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 val nativeNdkVersion = "28.2.13676358"
@@ -39,11 +40,7 @@ fun calculateAppVersionCode(versionName: String): Int {
 android {
     namespace = "com.notcvnt.rknhardering"
     ndkVersion = nativeNdkVersion
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.notcvnt.rknhardering"
@@ -78,6 +75,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
     }
     buildFeatures {
         buildConfig = true

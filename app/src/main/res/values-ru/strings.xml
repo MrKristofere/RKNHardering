@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">RKNHardering</string>
     <string name="github_repo_url">https://github.com/xtclovver/RKNHardering</string>
+    <string name="matrix_room_url">https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech</string>
     <string name="run_check_notice">Во время проверки приложение выполнит сетевые запросы к доменам:\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ip.mail.ru\n• api4.ipify.org\n• api6.ipify.org\n• 2ip.ru\n• ipv4-internet.yandex.net\n• ipv6-internet.yandex.net\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\nЕсли в настройках выбран кастомный DNS-резолвер, приложение также будет обращаться к его IP-адресам или DoH-домену.\n\nЕсли включён CDN pulling, приложение дополнительно отправит HTTPS-запросы к redirector.googlevideo.com, rutracker.org и meduza.io, чтобы проверить, какой внешний IP и trace-данные эти точки вернут.\n\nЕсли включена проверка утечек call transport, приложение дополнительно отправит UDP/STUN-запросы к встроенным Telegram-целям. Цели WhatsApp используются только в debug или experimental сборках.\n\nЕсли включена проверка подмены ICMP, приложение дополнительно выполнит DNS-резолв и ping для instagram.com и google.com, чтобы сравнить доступность заблокированной цели и подозрительно низкие RTT.\n\nЕсли включена отладочная диагностика, приложение сможет сформировать копируемый диагностический отчёт по последней завершённой проверке, даже если она прошла успешно. Отчёт хранится только в памяти, пока вы его не скопируете. Ответы CDN pulling тоже попадут в этот отчёт.\n\nНажимая кнопку «Запустить проверку», вы соглашаетесь, что с вашего устройства будут выполнены эти сетевые запросы.\n\nПриложение не ведет логи этих запросов. Доступ к сети можно будет отключить в настройках приложения.</string>
 
     <string name="settings_title">Настройки</string>
@@ -21,6 +22,8 @@
     <string name="settings_cat_privacy_desc">Маскировка IP</string>
     <string name="settings_cat_appearance">Оформление</string>
     <string name="settings_cat_appearance_desc">Тема и язык</string>
+    <string name="settings_cat_accessibility">Специальные возможности</string>
+    <string name="settings_cat_accessibility_desc">Цветовое зрение</string>
     <string name="settings_cat_about">О приложении</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">Отладка</string>
@@ -91,6 +94,13 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">Режим цветового зрения</string>
+    <string name="settings_color_vision_preview">Превью статусов</string>
+    <string name="settings_color_vision_off">Выкл</string>
+    <string name="settings_color_vision_red_green">Красно-зелёный</string>
+    <string name="settings_color_vision_blue_yellow">Сине-жёлтый</string>
+    <string name="settings_color_vision_achromatopsia">Ахроматопсия</string>
+    <string name="settings_accessibility_status_preview_content">Статус: %1$s</string>
     <string name="settings_permissions">Разрешения</string>
     <string name="settings_permissions_desc">Управление разрешениями приложения</string>
     <string name="settings_github">GitHub</string>
@@ -106,6 +116,8 @@
     <string name="main_export_saved">Экспорт сохранён</string>
     <string name="main_export_failed">Не удалось сохранить экспорт</string>
     <string name="settings_github_desc">xtclovver/RKNHardering</string>
+    <string name="settings_matrix">Matrix</string>
+    <string name="settings_matrix_desc">RKN_Hardering:matrix.kangel.tech</string>
     <string name="settings_port_range_from">От</string>
     <string name="settings_port_range_to">До</string>
 
@@ -452,6 +464,7 @@
     <string name="checker_bypass_proxy_ip">IP через прокси: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: подтвержден (IP отличаются)</string>
     <string name="checker_bypass_split_disabled">Per-app split отключен: IP совпадают</string>
+    <string name="checker_bypass_auth_required">Прокси требует аутентификацию: обход не подтверждён</string>
     <string name="checker_bypass_mtproto_reachable">MTProto-прокси: Telegram DC доступен через %1$s -> %2$s</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe: Telegram DC недоступен через прокси</string>
     <string name="checker_bypass_no_open_proxy">Открытые прокси на localhost: не обнаружены</string>
@@ -500,6 +513,7 @@
     <!-- InstalledVpnAppDetector -->
     <string name="checker_vpn_known_apps_none">Известные VPN/Proxy-приложения и VpnService-провайдеры: не обнаружены</string>
     <string name="checker_vpn_installed_app">Установлено приложение: %1$s (%2$s)</string>
+    <string name="checker_vpn_installed_app_by_name">Установлено приложение с "VPN" в названии: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">Приложение объявляет VpnService: %1$s (%2$s)</string>
 
     <!-- Redesign: main screen -->
@@ -522,6 +536,7 @@
     <string name="tile_hint_detected_count">%1$d из %2$d выявлено</string>
     <string name="tile_hint_review">Требует проверки</string>
     <string name="tile_hint_error">Ошибка</string>
+    <string name="settings_status_no_data">Нет данных</string>
     <string name="settings_value_on">Вкл</string>
     <string name="settings_value_off">Выкл</string>
     <string name="settings_value_network_all">Все запросы</string>
