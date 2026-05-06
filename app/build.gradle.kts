@@ -61,6 +61,10 @@ android {
             useLegacyPackaging = false
         }
     }
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }

@@ -1,0 +1,1 @@
+Версия 2.6.11: убран блок dependency metadata из APK signing block для совместимости с воспроизводимой сборкой F-Droid.
