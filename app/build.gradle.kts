@@ -1,5 +1,3 @@
-import org.gradle.api.GradleException
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,35 +5,6 @@ plugins {
 
 val nativeNdkVersion = "28.2.13676358"
 val nativeCmakeVersion = "3.22.1"
-
-val appVersionName = resolveAppVersionName()
-val appVersionCode = calculateAppVersionCode(appVersionName)
-
-fun resolveAppVersionName(): String {
-    val rawVersion = providers.gradleProperty("appVersionName").orElse("2.0.0").get().trim()
-    val normalizedVersion = rawVersion.removePrefix("v")
-
-    if (!Regex("""\d+\.\d+\.\d+""").matches(normalizedVersion)) {
-        throw GradleException("appVersionName must match X.Y.Z, got '$rawVersion'")
-    }
-
-    return normalizedVersion
-}
-
-fun calculateAppVersionCode(versionName: String): Int {
-    val parts = versionName.split(".")
-    val major = parts[0].toInt()
-    val minor = parts[1].toInt()
-    val patch = parts[2].toInt()
-
-    if (minor !in 0..99 || patch !in 0..99) {
-        throw GradleException(
-            "appVersionName supports only minor and patch values from 0 to 99, got '$versionName'"
-        )
-    }
-
-    return (major * 10_000) + (minor * 100) + patch
-}
 
 android {
     namespace = "com.notcvnt.rknhardering"
@@ -46,8 +15,8 @@ android {
         applicationId = "com.notcvnt.rknhardering"
         minSdk = 26
         targetSdk = 36
-        versionCode = appVersionCode
-        versionName = appVersionName
+        versionCode = 20608
+        versionName = "2.6.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         androidResources.localeFilters += listOf("en", "ru", "fa", "zh-rCN")
