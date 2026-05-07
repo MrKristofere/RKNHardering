@@ -84,6 +84,9 @@
     <string name="settings_dns_bootstrap_hint">8.8.8.8, 8.8.4.4</string>
     <string name="settings_privacy_mode">隐私模式</string>
     <string name="settings_privacy_mode_desc">IP 显示为 185.22.*.*</string>
+    <string name="settings_icon_style">应用图标</string>
+    <string name="settings_icon_style_classic">经典</string>
+    <string name="settings_icon_style_new">新版</string>
     <string name="settings_theme">主题</string>
     <string name="settings_theme_light">浅色</string>
     <string name="settings_theme_dark">深色</string>
@@ -496,6 +499,9 @@
     <string name="checker_bypass_open_proxy_review_suffix">（需要确认是否存在绕过）</string>
     <string name="checker_bypass_no_xray">Xray gRPC API：未发现</string>
     <string name="checker_bypass_xray_api">Xray gRPC API：%1$s</string>
+    <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService：%1$s</string>
+    <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds 不可用；未暴露出站地址。</string>
+    <string name="checker_bypass_xray_stats_sample">StatsService 计数器：%1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="other">&#160;&#160;&#8230;还有 %1$d 个 outbound</item>
     </plurals>

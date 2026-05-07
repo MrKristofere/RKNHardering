@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.ScanResult
@@ -18,6 +19,7 @@ import android.telephony.CellInfoGsm
 import android.telephony.CellInfoLte
 import android.telephony.CellInfoWcdma
 import android.telephony.TelephonyManager
+import android.telephony.gsm.GsmCellLocation
 import androidx.annotation.DoNotInline
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
@@ -47,6 +49,26 @@ object LocationSignalsChecker {
         val isRoaming: Boolean?,
     )
 
+    private data class CellCollectionResult(
+        val candidates: List<CellLookupCandidate> = emptyList(),
+        val rawInfoCount: Int = 0,
+        val rawInfoTypes: List<String> = emptyList(),
+        val candidateRadios: List<String> = emptyList(),
+    )
+
+    private data class WifiCollectionResult(
+        val candidates: List<WifiLookupCandidate> = emptyList(),
+        val cachedScanCandidatesCount: Int = 0,
+        val freshScanCandidatesCount: Int? = null,
+        val connectedCandidateAvailable: Boolean = false,
+    )
+
+    private data class BssidCollectionResult(
+        val bssid: String?,
+        val source: String?,
+        val unavailableReason: String?,
+    )
+
     internal data class LocationSnapshot(
         val networkMcc: String?,
         val networkCountryIso: String?,
@@ -59,6 +81,22 @@ object LocationSignalsChecker {
         val bssid: String?,
         val cellLookupPermissionGranted: Boolean,
         val wifiPermissionGranted: Boolean,
+        val locationServicesEnabled: Boolean = true,
+        val telephonyRadioAccessAvailable: Boolean = true,
+        val wifiFeatureAvailable: Boolean = true,
+        val nearbyWifiPermissionGranted: Boolean = true,
+        val networkRequestsEnabled: Boolean = true,
+        val cellRawInfoCount: Int = 0,
+        val cellRawInfoTypes: List<String> = emptyList(),
+        val cellCandidateRadios: List<String> = emptyList(),
+        val beaconDbCellCandidatesUsedCount: Int = 0,
+        val beaconDbUnsupportedCellRadios: List<String> = emptyList(),
+        val beaconDbWifiCandidatesUsedCount: Int = 0,
+        val wifiCachedScanCandidatesCount: Int = 0,
+        val wifiFreshScanCandidatesCount: Int? = null,
+        val wifiConnectedCandidateAvailable: Boolean = false,
+        val bssidSource: String? = null,
+        val bssidUnavailableReason: String? = null,
     )
 
     private const val RUSSIA_MCC = "250"
@@ -67,6 +105,7 @@ object LocationSignalsChecker {
     private const val WIFI_SCAN_TIMEOUT_MS = 3_000L
     private const val MAX_CELL_TOWERS = 6
     private const val MAX_WIFI_ACCESS_POINTS = 12
+    private const val MAX_NR_CELL_ID = 68_719_476_735L
 
     suspend fun check(
         context: Context,
@@ -89,6 +128,9 @@ object LocationSignalsChecker {
         }
         val cellLookupPermissionGranted = fineLocationGranted
         val wifiPermissionGranted = fineLocationGranted && nearbyWifiGranted
+        val locationServicesEnabled = isLocationEnabled(context)
+        val telephonyRadioAccessAvailable = hasTelephonyRadioAccess(context)
+        val wifiFeatureAvailable = context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI)
 
         var networkMcc: String? = null
         var networkCountryIso: String? = null
@@ -110,21 +152,29 @@ object LocationSignalsChecker {
 
         val simCards = collectSimCards(context, tm)
 
-        val cellCandidates = if (cellLookupPermissionGranted) {
-            collectCellCandidates(context, tm).also { cellCandidatesCount = it.size }
+        val cellCollection = if (cellLookupPermissionGranted && locationServicesEnabled && telephonyRadioAccessAvailable) {
+            collectCellCandidates(context, tm, simCards).also { cellCandidatesCount = it.candidates.size }
         } else {
-            emptyList()
+            CellCollectionResult()
         }
-        val wifiCandidates = if (wifiPermissionGranted) {
-            collectWifiCandidates(context).also { wifiAccessPointCandidatesCount = it.size }
+        val cellCandidates = cellCollection.candidates
+        val wifiCollection = if (wifiPermissionGranted && locationServicesEnabled && wifiFeatureAvailable) {
+            collectWifiCandidates(context).also { wifiAccessPointCandidatesCount = it.candidates.size }
         } else {
-            emptyList()
+            WifiCollectionResult()
         }
+        val wifiCandidates = wifiCollection.candidates
+
+        val beaconDbClient = BeaconDbClient(countryResolver = { lat, lon ->
+            reverseGeocodeCountry(context, lat, lon)
+        }, resolverConfig = resolverConfig)
+        val beaconDbInput = beaconDbClient.inputDiagnostics(cellCandidates, wifiCandidates)
+        val beaconDbCellCandidatesUsedCount = beaconDbInput.supportedCellCount
+        val beaconDbUnsupportedCellRadios = beaconDbInput.unsupportedCellRadios
+        val beaconDbWifiCandidatesUsedCount = beaconDbInput.wifiUsedCount
 
         if ((cellLookupPermissionGranted || wifiPermissionGranted) && networkRequestsEnabled) {
-            val lookup = BeaconDbClient(countryResolver = { lat, lon ->
-                reverseGeocodeCountry(context, lat, lon)
-            }, resolverConfig = resolverConfig).lookup(cellCandidates, wifiCandidates)
+            val lookup = beaconDbClient.lookup(cellCandidates, wifiCandidates)
             cellCountryCode = lookup.countryCode
             cellLookupSummary = buildString {
                 append(lookup.summary)
@@ -134,10 +184,10 @@ object LocationSignalsChecker {
             }
         }
 
-        val bssid = if (wifiPermissionGranted) {
-            runCatching { getBssid(context) }.getOrNull()
+        val bssidResult = if (wifiPermissionGranted && locationServicesEnabled && wifiFeatureAvailable) {
+            collectBssid(context, wifiCandidates)
         } else {
-            null
+            BssidCollectionResult(bssid = null, source = null, unavailableReason = null)
         }
 
         return LocationSnapshot(
@@ -149,14 +199,50 @@ object LocationSignalsChecker {
             cellLookupSummary = cellLookupSummary,
             cellCandidatesCount = cellCandidatesCount,
             wifiAccessPointCandidatesCount = wifiAccessPointCandidatesCount,
-            bssid = bssid,
+            bssid = bssidResult.bssid,
             cellLookupPermissionGranted = cellLookupPermissionGranted,
             wifiPermissionGranted = wifiPermissionGranted,
+            locationServicesEnabled = locationServicesEnabled,
+            telephonyRadioAccessAvailable = telephonyRadioAccessAvailable,
+            wifiFeatureAvailable = wifiFeatureAvailable,
+            nearbyWifiPermissionGranted = nearbyWifiGranted,
+            networkRequestsEnabled = networkRequestsEnabled,
+            cellRawInfoCount = cellCollection.rawInfoCount,
+            cellRawInfoTypes = cellCollection.rawInfoTypes,
+            cellCandidateRadios = cellCollection.candidateRadios,
+            beaconDbCellCandidatesUsedCount = beaconDbCellCandidatesUsedCount,
+            beaconDbUnsupportedCellRadios = beaconDbUnsupportedCellRadios,
+            beaconDbWifiCandidatesUsedCount = beaconDbWifiCandidatesUsedCount,
+            wifiCachedScanCandidatesCount = wifiCollection.cachedScanCandidatesCount,
+            wifiFreshScanCandidatesCount = wifiCollection.freshScanCandidatesCount,
+            wifiConnectedCandidateAvailable = wifiCollection.connectedCandidateAvailable,
+            bssidSource = bssidResult.source,
+            bssidUnavailableReason = bssidResult.unavailableReason,
         )
     }
 
     private fun hasPermission(context: Context, permission: String): Boolean {
         return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun isLocationEnabled(context: Context): Boolean {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return true
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                locationManager.isLocationEnabled
+            } else {
+                @Suppress("DEPRECATION")
+                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            }
+        }.getOrDefault(true)
+    }
+
+    private fun hasTelephonyRadioAccess(context: Context): Boolean {
+        val packageManager = context.packageManager
+        return packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS) ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
     }
 
     private fun collectSimCards(context: Context, tm: TelephonyManager): List<SimCardInfo> {
@@ -215,20 +301,59 @@ object LocationSignalsChecker {
     private suspend fun collectCellCandidates(
         context: Context,
         tm: TelephonyManager,
-    ): List<CellLookupCandidate> {
+        simCards: List<SimCardInfo>,
+    ): CellCollectionResult {
         if (!hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
-            return emptyList()
+            return CellCollectionResult()
         }
-        val fresh = requestFreshCellInfo(context, tm)
-        val fallback = getCachedCellInfo(tm)
-        return (fresh.ifEmpty { fallback })
+        val subscriptionManagers = simCards
+            .mapNotNull { it.subscriptionId.takeIf { subscriptionId -> subscriptionId >= 0 } }
+            .distinct()
+            .mapNotNull { subscriptionId ->
+                runCatching { tm.createForSubscriptionId(subscriptionId) }.getOrNull()
+            }
+        val managers = (listOf(tm) + subscriptionManagers).distinct()
+        val cellInfo = managers.flatMap { collectCellInfo(context, it) }
+        val rawInfoTypes = cellInfo
+            .map(::cellInfoTypeName)
+            .distinct()
+            .sorted()
+        val candidates = cellInfo
             .mapNotNull(::toLookupCandidate)
-            .distinctBy { listOf(it.radio, it.mcc, it.mnc, it.areaCode, it.cellId) }
+            .distinctBy { listOf(it.radio, it.mcc, it.mnc, it.areaCode, it.cellId, it.newRadioCellId) }
             .sortedWith(
                 compareByDescending<CellLookupCandidate> { it.registered }
                     .thenByDescending { it.signalStrength ?: Int.MIN_VALUE },
             )
             .take(MAX_CELL_TOWERS)
+
+        if (candidates.isNotEmpty()) {
+            return CellCollectionResult(
+                candidates = candidates,
+                rawInfoCount = cellInfo.size,
+                rawInfoTypes = rawInfoTypes,
+                candidateRadios = summarizeCellRadios(candidates),
+            )
+        }
+
+        val legacyCandidates = managers
+            .mapNotNull(::legacyGsmCellCandidate)
+            .distinctBy { listOf(it.radio, it.mcc, it.mnc, it.areaCode, it.cellId, it.newRadioCellId) }
+            .take(MAX_CELL_TOWERS)
+        return CellCollectionResult(
+            candidates = legacyCandidates,
+            rawInfoCount = cellInfo.size,
+            rawInfoTypes = rawInfoTypes,
+            candidateRadios = summarizeCellRadios(legacyCandidates),
+        )
+    }
+
+    private suspend fun collectCellInfo(
+        context: Context,
+        tm: TelephonyManager,
+    ): List<CellInfo> {
+        return (requestFreshCellInfo(context, tm) + getCachedCellInfo(tm))
+            .distinctBy { it.toString() }
     }
 
     @Suppress("MissingPermission")
@@ -250,6 +375,10 @@ object LocationSignalsChecker {
                             override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
                                 resumeOnce(continuation, completed, cellInfo.toList())
                             }
+
+                            override fun onError(errorCode: Int, detail: Throwable?) {
+                                resumeOnce(continuation, completed, emptyList())
+                            }
                         },
                     )
                 }.isSuccess
@@ -268,6 +397,22 @@ object LocationSignalsChecker {
     @Suppress("MissingPermission")
     private fun getCachedCellInfo(tm: TelephonyManager): List<CellInfo> {
         return runCatching { tm.allCellInfo.orEmpty() }.getOrDefault(emptyList())
+    }
+
+    @Suppress("DEPRECATION", "MissingPermission")
+    private fun legacyGsmCellCandidate(tm: TelephonyManager): CellLookupCandidate? {
+        val operator = normalizeOperatorCode(tm.networkOperator)?.takeIf { it.length >= 4 } ?: return null
+        val location = runCatching { tm.cellLocation as? GsmCellLocation }.getOrNull() ?: return null
+        val areaCode = normalizeCellValue(location.lac) ?: return null
+        val cellId = normalizeCellValue(location.cid) ?: return null
+        return CellLookupCandidate(
+            radio = "gsm",
+            mcc = operator.substring(0, 3),
+            mnc = operator.substring(3),
+            areaCode = areaCode,
+            cellId = cellId,
+            registered = true,
+        )
     }
 
     private fun toLookupCandidate(info: CellInfo): CellLookupCandidate? {
@@ -323,19 +468,87 @@ object LocationSignalsChecker {
                 )
             }
 
-            else -> null
+            else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                Api29Impl.nrCandidate(info)
+            } else {
+                null
+            }
         }
     }
 
-    private suspend fun collectWifiCandidates(context: Context): List<WifiLookupCandidate> {
+    private suspend fun collectWifiCandidates(context: Context): WifiCollectionResult {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val cachedCandidates = currentWifiCandidates(wifiManager)
         val refreshedCandidates = requestFreshWifiScan(context, wifiManager)
+        val connectedCandidate = currentWifiConnectionCandidate(context, wifiManager)
 
-        return (refreshedCandidates ?: cachedCandidates)
-            .distinctBy { it.macAddress }
-            .sortedByDescending { it.signalStrength ?: Int.MIN_VALUE }
-            .take(MAX_WIFI_ACCESS_POINTS)
+        return WifiCollectionResult(
+            candidates = mergeWifiCandidates(
+                cached = cachedCandidates,
+                refreshed = refreshedCandidates.orEmpty(),
+                connected = connectedCandidate,
+            ),
+            cachedScanCandidatesCount = cachedCandidates.size,
+            freshScanCandidatesCount = refreshedCandidates?.size,
+            connectedCandidateAvailable = connectedCandidate != null,
+        )
+    }
+
+    private fun summarizeCellRadios(candidates: List<CellLookupCandidate>): List<String> {
+        return candidates
+            .map { it.radio.lowercase(Locale.US) }
+            .distinct()
+            .sorted()
+    }
+
+    private fun cellInfoTypeName(info: CellInfo): String {
+        return info.javaClass.simpleName
+            .removePrefix("CellInfo")
+            .takeIf { it.isNotBlank() }
+            ?.lowercase(Locale.US)
+            ?: info.javaClass.name
+    }
+
+    private fun collectBssid(
+        context: Context,
+        wifiCandidates: List<WifiLookupCandidate>,
+    ): BssidCollectionResult {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val wifiInfo = getWifiInfo(context, wifiManager)
+        val normalizedBssid = normalizeMacAddress(wifiInfo?.bssid)
+        if (normalizedBssid != null) {
+            return BssidCollectionResult(
+                bssid = normalizedBssid,
+                source = "connected Wi-Fi info",
+                unavailableReason = null,
+            )
+        }
+
+        val singleScanCandidate = wifiCandidates.singleOrNull()
+        if (singleScanCandidate != null) {
+            val reason = when {
+                wifiInfo == null -> "Wi-Fi info unavailable; using the only scan candidate"
+                wifiInfo.bssid == PLACEHOLDER_BSSID -> "connected Wi-Fi info is redacted by Android; using the only scan candidate"
+                else -> "connected Wi-Fi BSSID is unavailable; using the only scan candidate"
+            }
+            return BssidCollectionResult(
+                bssid = singleScanCandidate.macAddress,
+                source = "single Wi-Fi scan candidate",
+                unavailableReason = reason,
+            )
+        }
+
+        val reason = when {
+            wifiInfo == null -> "Wi-Fi info unavailable"
+            wifiInfo.bssid == PLACEHOLDER_BSSID -> "connected Wi-Fi info is redacted by Android"
+            wifiInfo.bssid.isNullOrBlank() -> "connected Wi-Fi BSSID is empty"
+            else -> "connected Wi-Fi BSSID is invalid"
+        }
+        return BssidCollectionResult(
+            bssid = null,
+            source = null,
+            unavailableReason = reason,
+        )
     }
 
     @Suppress("MissingPermission", "DEPRECATION")
@@ -392,6 +605,39 @@ object LocationSignalsChecker {
                 ?.mapNotNull(::toWifiLookupCandidate)
                 .orEmpty()
         }.getOrDefault(emptyList())
+    }
+
+    private fun currentWifiConnectionCandidate(
+        context: Context,
+        wifiManager: WifiManager,
+    ): WifiLookupCandidate? {
+        val wifiInfo = getWifiInfo(context, wifiManager) ?: return null
+        val macAddress = normalizeMacAddress(wifiInfo.bssid) ?: return null
+        val ssid = normalizeSsid(wifiInfo.ssid)
+        if (ssid?.endsWith("_nomap", ignoreCase = true) == true) return null
+        return WifiLookupCandidate(
+            macAddress = macAddress,
+            frequency = wifiInfo.frequency.takeIf { it > 0 },
+            signalStrength = normalizeSignalStrength(wifiInfo.rssi),
+        )
+    }
+
+    internal fun mergeWifiCandidates(
+        cached: List<WifiLookupCandidate>,
+        refreshed: List<WifiLookupCandidate>,
+        connected: WifiLookupCandidate?,
+    ): List<WifiLookupCandidate> {
+        return (cached + refreshed + listOfNotNull(connected))
+            .groupBy { it.macAddress }
+            .values
+            .mapNotNull { candidates ->
+                candidates.maxWithOrNull(
+                    compareBy<WifiLookupCandidate> { it.signalStrength ?: Int.MIN_VALUE }
+                        .thenBy { it.frequency ?: 0 },
+                )
+            }
+            .sortedByDescending { it.signalStrength ?: Int.MIN_VALUE }
+            .take(MAX_WIFI_ACCESS_POINTS)
     }
 
     private fun toWifiLookupCandidate(scanResult: ScanResult): WifiLookupCandidate? {
@@ -480,6 +726,29 @@ object LocationSignalsChecker {
         }
     }
 
+    // Keep newer cell identity accessors isolated so older devices never resolve them.
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private object Api29Impl {
+        @DoNotInline
+        fun nrCandidate(info: CellInfo): CellLookupCandidate? {
+            if (info !is android.telephony.CellInfoNr) return null
+            val identity = info.cellIdentity as? android.telephony.CellIdentityNr ?: return null
+            val mcc = normalizeOperatorCode(identity.mccString) ?: return null
+            val mnc = normalizeOperatorCode(identity.mncString) ?: return null
+            val areaCode = normalizeCellValue(identity.tac) ?: return null
+            val newRadioCellId = normalizeNewRadioCellValue(identity.nci) ?: return null
+            return CellLookupCandidate(
+                radio = "nr",
+                mcc = mcc,
+                mnc = mnc,
+                areaCode = areaCode,
+                newRadioCellId = newRadioCellId,
+                registered = info.isRegistered,
+                signalStrength = normalizeSignalStrength(info.cellSignalStrength.dbm),
+            )
+        }
+    }
+
     // Keep API 28-only operator accessors isolated so pre-P devices never resolve them.
     @RequiresApi(Build.VERSION_CODES.P)
     private object Api28Impl {
@@ -526,6 +795,10 @@ object LocationSignalsChecker {
 
     private fun normalizeCellValue(value: Int): Long? {
         return value.toLong().takeIf { it in 0 until Int.MAX_VALUE.toLong() }
+    }
+
+    private fun normalizeNewRadioCellValue(value: Long): Long? {
+        return value.takeIf { it in 0..MAX_NR_CELL_ID }
     }
 
     private fun normalizeSignalStrength(value: Int): Int? {
@@ -575,15 +848,22 @@ object LocationSignalsChecker {
 
     @Suppress("DEPRECATION")
     private fun getBssid(context: Context): String? {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        return getWifiInfo(context, wifiManager)?.bssid
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getWifiInfo(context: Context, wifiManager: WifiManager): WifiInfo? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val network = cm.activeNetwork ?: return null
-            val caps = cm.getNetworkCapabilities(network) ?: return null
-            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return null
-            (caps.transportInfo as? WifiInfo)?.bssid
+            val network = cm.activeNetwork
+            val caps = network?.let { cm.getNetworkCapabilities(it) }
+            val transportInfo = caps
+                ?.takeIf { it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) }
+                ?.transportInfo as? WifiInfo
+            transportInfo ?: wifiManager.connectionInfo
         } else {
-            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            wm.connectionInfo?.bssid
+            wifiManager.connectionInfo
         }
     }
 
@@ -648,8 +928,16 @@ object LocationSignalsChecker {
             }
         }
 
+        if (!snapshot.locationServicesEnabled) {
+            findings += Finding("Location services: disabled")
+        }
+
         if (!snapshot.cellLookupPermissionGranted) {
             findings += Finding("Cell lookup: ACCESS_FINE_LOCATION permission is not granted")
+        } else if (!snapshot.locationServicesEnabled) {
+            findings += Finding("Cell lookup: system location is disabled")
+        } else if (!snapshot.telephonyRadioAccessAvailable) {
+            findings += Finding("Cell lookup: telephony radio access is unavailable")
         } else {
             findings += Finding("Cell lookup candidates: ${snapshot.cellCandidatesCount}")
             if (snapshot.cellCandidatesCount == 0) {
@@ -659,6 +947,10 @@ object LocationSignalsChecker {
 
         if (!snapshot.wifiPermissionGranted) {
             findings += Finding("Wi-Fi scan: permissions are not granted")
+        } else if (!snapshot.locationServicesEnabled) {
+            findings += Finding("Wi-Fi scan: system location is disabled")
+        } else if (!snapshot.wifiFeatureAvailable) {
+            findings += Finding("Wi-Fi scan: Wi-Fi feature is unavailable")
         } else {
             findings += Finding("Wi-Fi scan candidates: ${snapshot.wifiAccessPointCandidatesCount}")
             if (snapshot.wifiAccessPointCandidatesCount == 0) {
@@ -677,18 +969,49 @@ object LocationSignalsChecker {
 
         if (!snapshot.wifiPermissionGranted) {
             findings += Finding("BSSID: permission is not granted")
+        } else if (!snapshot.locationServicesEnabled) {
+            findings += Finding("BSSID: system location is disabled")
+        } else if (!snapshot.wifiFeatureAvailable) {
+            findings += Finding("BSSID: Wi-Fi feature is unavailable")
         } else if (snapshot.bssid == null || snapshot.bssid == PLACEHOLDER_BSSID) {
             findings += Finding("BSSID: unavailable")
         } else {
             findings += Finding("BSSID: ${snapshot.bssid}")
         }
 
-        return CategoryResult(
+        val detected = evidence.any {
+            it.detected && it.confidence >= EvidenceConfidence.MEDIUM
+        }
+
+        val result = CategoryResult(
             name = "Location signals",
-            detected = false,
+            detected = detected,
             findings = findings,
             needsReview = needsReview,
             evidence = evidence,
+        )
+        return LocationSignalsDiagnosticsRegistry.attach(
+            result,
+            LocationSignalsDiagnostics(
+                fineLocationPermissionGranted = snapshot.cellLookupPermissionGranted,
+                nearbyWifiPermissionGranted = snapshot.nearbyWifiPermissionGranted,
+                locationServicesEnabled = snapshot.locationServicesEnabled,
+                telephonyRadioAccessAvailable = snapshot.telephonyRadioAccessAvailable,
+                wifiFeatureAvailable = snapshot.wifiFeatureAvailable,
+                networkRequestsEnabled = snapshot.networkRequestsEnabled,
+                cellRawInfoCount = snapshot.cellRawInfoCount,
+                cellRawInfoTypes = snapshot.cellRawInfoTypes,
+                cellCandidateRadios = snapshot.cellCandidateRadios,
+                beaconDbCellCandidatesUsedCount = snapshot.beaconDbCellCandidatesUsedCount,
+                beaconDbUnsupportedCellRadios = snapshot.beaconDbUnsupportedCellRadios,
+                beaconDbWifiCandidatesUsedCount = snapshot.beaconDbWifiCandidatesUsedCount,
+                wifiAccessPointCandidatesCount = snapshot.wifiAccessPointCandidatesCount,
+                wifiCachedScanCandidatesCount = snapshot.wifiCachedScanCandidatesCount,
+                wifiFreshScanCandidatesCount = snapshot.wifiFreshScanCandidatesCount,
+                wifiConnectedCandidateAvailable = snapshot.wifiConnectedCandidateAvailable,
+                bssidSource = snapshot.bssidSource,
+                bssidUnavailableReason = snapshot.bssidUnavailableReason,
+            ),
         )
     }
 

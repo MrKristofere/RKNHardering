@@ -119,8 +119,10 @@ object VerdictEngine {
         val tunProbeReview = directSigns.evidence.any {
             it.source == EvidenceSource.TUN_ACTIVE_PROBE && !it.detected
         }
+        val locationSignalHit = locationSignals.detected
         if (matrix == Verdict.NOT_DETECTED && (
                 bypassResult.needsReview ||
+                    locationSignalHit ||
                     hasActionableCallTransportLeak ||
                     icmpSpoofing.needsReview ||
                     nativeReviewHit ||

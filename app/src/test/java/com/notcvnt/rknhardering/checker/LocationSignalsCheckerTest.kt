@@ -30,6 +30,7 @@ class LocationSignalsCheckerTest {
             ),
         )
 
+        assertTrue(result.detected)
         assertTrue(result.needsReview)
         assertTrue(
             result.evidence.any {
@@ -49,10 +50,34 @@ class LocationSignalsCheckerTest {
             ),
         )
 
+        assertFalse(result.detected)
         assertTrue(result.needsReview)
         assertTrue(
             result.evidence.any {
                 it.source == EvidenceSource.LOCATION_SIGNALS && it.confidence == EvidenceConfidence.LOW
+            },
+        )
+    }
+
+    @Test
+    fun `mcc 310 non roaming network is detected as location signal`() {
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                networkMcc = "310",
+                networkCountryIso = "us",
+                networkOperatorName = "T-Mobile",
+                simCards = listOf(sim(simMcc = "310", simCountryIso = "us", operatorName = "T-Mobile", isRoaming = false)),
+            ),
+        )
+
+        assertTrue(result.detected)
+        assertTrue(result.needsReview)
+        assertTrue(result.findings.any { it.description == "Network MCC 310 (US) is not Russia" })
+        assertTrue(
+            result.evidence.any {
+                it.source == EvidenceSource.LOCATION_SIGNALS &&
+                    it.detected &&
+                    it.confidence == EvidenceConfidence.MEDIUM
             },
         )
     }
@@ -105,6 +130,29 @@ class LocationSignalsCheckerTest {
     }
 
     @Test
+    fun `cell lookup diagnostics expose raw radios and beacon db eligibility`() {
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                cellLookupPermissionGranted = true,
+                cellCandidatesCount = 1,
+                cellRawInfoCount = 1,
+                cellRawInfoTypes = listOf("nr"),
+                cellCandidateRadios = listOf("nr"),
+                beaconDbCellCandidatesUsedCount = 0,
+                beaconDbUnsupportedCellRadios = listOf("nr"),
+            ),
+        )
+        val diagnostics = LocationSignalsDiagnosticsRegistry.find(result)
+
+        assertTrue(result.findings.none { it.description.startsWith("Cell raw info:") })
+        assertEquals(1, diagnostics?.cellRawInfoCount)
+        assertEquals(listOf("nr"), diagnostics?.cellRawInfoTypes)
+        assertEquals(listOf("nr"), diagnostics?.cellCandidateRadios)
+        assertEquals(0, diagnostics?.beaconDbCellCandidatesUsedCount)
+        assertEquals(listOf("nr"), diagnostics?.beaconDbUnsupportedCellRadios)
+    }
+
+    @Test
     fun `wifi permission absence is reported explicitly`() {
         val result = LocationSignalsChecker.evaluate(snapshot(wifiPermissionGranted = false))
 
@@ -122,6 +170,69 @@ class LocationSignalsCheckerTest {
         )
 
         assertTrue(result.findings.any { it.description == "Wi-Fi scan candidates: 4" })
+    }
+
+    @Test
+    fun `wifi diagnostics expose scan sources and beacon db minimum`() {
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                wifiPermissionGranted = true,
+                wifiAccessPointCandidatesCount = 1,
+                wifiCachedScanCandidatesCount = 1,
+                wifiFreshScanCandidatesCount = null,
+                wifiConnectedCandidateAvailable = false,
+                beaconDbWifiCandidatesUsedCount = 0,
+            ),
+        )
+        val diagnostics = LocationSignalsDiagnosticsRegistry.find(result)
+
+        assertTrue(result.findings.none { it.description.startsWith("Wi-Fi scan sources:") })
+        assertEquals(1, diagnostics?.wifiCachedScanCandidatesCount)
+        assertEquals(null, diagnostics?.wifiFreshScanCandidatesCount)
+        assertEquals(false, diagnostics?.wifiConnectedCandidateAvailable)
+        assertEquals(0, diagnostics?.beaconDbWifiCandidatesUsedCount)
+    }
+
+    @Test
+    fun `location services disabled is reported for radio lookups`() {
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                cellLookupPermissionGranted = true,
+                wifiPermissionGranted = true,
+                locationServicesEnabled = false,
+            ),
+        )
+
+        assertTrue(result.findings.any { it.description == "Location services: disabled" })
+        assertTrue(result.findings.any { it.description == "Cell lookup: system location is disabled" })
+        assertTrue(result.findings.any { it.description == "Wi-Fi scan: system location is disabled" })
+        assertTrue(result.findings.any { it.description == "BSSID: system location is disabled" })
+        assertFalse(result.findings.any { it.description == "Cell lookup: base station identifiers are unavailable" })
+    }
+
+    @Test
+    fun `missing telephony radio access is reported explicitly`() {
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                cellLookupPermissionGranted = true,
+                telephonyRadioAccessAvailable = false,
+            ),
+        )
+
+        assertTrue(result.findings.any { it.description == "Cell lookup: telephony radio access is unavailable" })
+    }
+
+    @Test
+    fun `missing wifi feature is reported explicitly`() {
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                wifiPermissionGranted = true,
+                wifiFeatureAvailable = false,
+            ),
+        )
+
+        assertTrue(result.findings.any { it.description == "Wi-Fi scan: Wi-Fi feature is unavailable" })
+        assertTrue(result.findings.any { it.description == "BSSID: Wi-Fi feature is unavailable" })
     }
 
     @Test
@@ -160,10 +271,12 @@ class LocationSignalsCheckerTest {
             snapshot(
                 wifiPermissionGranted = true,
                 bssid = "AA:BB:CC:DD:EE:FF",
+                bssidSource = "connected Wi-Fi info",
             ),
         )
 
         assertTrue(result.findings.any { it.description.contains("AA:BB:CC:DD:EE:FF") })
+        assertEquals("connected Wi-Fi info", LocationSignalsDiagnosticsRegistry.find(result)?.bssidSource)
     }
 
     @Test
@@ -172,10 +285,40 @@ class LocationSignalsCheckerTest {
             snapshot(
                 wifiPermissionGranted = true,
                 bssid = "02:00:00:00:00:00",
+                bssidUnavailableReason = "connected Wi-Fi info is redacted by Android",
             ),
         )
 
         assertTrue(result.findings.any { it.description == "BSSID: unavailable" })
+        assertEquals(
+            "connected Wi-Fi info is redacted by Android",
+            LocationSignalsDiagnosticsRegistry.find(result)?.bssidUnavailableReason,
+        )
+    }
+
+    @Test
+    fun `wifi merge keeps cached candidates when fresh scan is empty`() {
+        val cached = listOf(wifi("aa:bb:cc:dd:ee:01", signalStrength = -60))
+
+        val merged = LocationSignalsChecker.mergeWifiCandidates(
+            cached = cached,
+            refreshed = emptyList(),
+            connected = null,
+        )
+
+        assertEquals(cached, merged)
+    }
+
+    @Test
+    fun `wifi merge includes connection and keeps strongest duplicate`() {
+        val merged = LocationSignalsChecker.mergeWifiCandidates(
+            cached = listOf(wifi("aa:bb:cc:dd:ee:01", signalStrength = -80)),
+            refreshed = listOf(wifi("aa:bb:cc:dd:ee:01", signalStrength = -55)),
+            connected = wifi("aa:bb:cc:dd:ee:02", signalStrength = -50),
+        )
+
+        assertEquals(listOf("aa:bb:cc:dd:ee:02", "aa:bb:cc:dd:ee:01"), merged.map { it.macAddress })
+        assertEquals(-55, merged.first { it.macAddress == "aa:bb:cc:dd:ee:01" }.signalStrength)
     }
 
     @Test
@@ -238,6 +381,7 @@ class LocationSignalsCheckerTest {
             ),
         )
 
+        assertTrue(result.detected)
         assertTrue(result.needsReview)
         assertTrue(
             result.evidence.any {
@@ -260,6 +404,7 @@ class LocationSignalsCheckerTest {
             ),
         )
 
+        assertFalse(result.detected)
         assertTrue(result.needsReview)
         assertTrue(
             result.evidence.any {
@@ -279,6 +424,7 @@ class LocationSignalsCheckerTest {
             ),
         )
 
+        assertTrue(result.detected)
         assertTrue(result.needsReview)
         assertFalse(result.findings.any { it.description.startsWith("SIM[") })
         assertTrue(
@@ -316,6 +462,22 @@ class LocationSignalsCheckerTest {
         bssid: String? = null,
         cellLookupPermissionGranted: Boolean = false,
         wifiPermissionGranted: Boolean = false,
+        locationServicesEnabled: Boolean = true,
+        telephonyRadioAccessAvailable: Boolean = true,
+        wifiFeatureAvailable: Boolean = true,
+        nearbyWifiPermissionGranted: Boolean = true,
+        networkRequestsEnabled: Boolean = true,
+        cellRawInfoCount: Int = 0,
+        cellRawInfoTypes: List<String> = emptyList(),
+        cellCandidateRadios: List<String> = emptyList(),
+        beaconDbCellCandidatesUsedCount: Int = 0,
+        beaconDbUnsupportedCellRadios: List<String> = emptyList(),
+        beaconDbWifiCandidatesUsedCount: Int = 0,
+        wifiCachedScanCandidatesCount: Int = 0,
+        wifiFreshScanCandidatesCount: Int? = null,
+        wifiConnectedCandidateAvailable: Boolean = false,
+        bssidSource: String? = null,
+        bssidUnavailableReason: String? = null,
     ): LocationSignalsChecker.LocationSnapshot {
         return LocationSignalsChecker.LocationSnapshot(
             networkMcc = networkMcc,
@@ -329,6 +491,31 @@ class LocationSignalsCheckerTest {
             bssid = bssid,
             cellLookupPermissionGranted = cellLookupPermissionGranted,
             wifiPermissionGranted = wifiPermissionGranted,
+            locationServicesEnabled = locationServicesEnabled,
+            telephonyRadioAccessAvailable = telephonyRadioAccessAvailable,
+            wifiFeatureAvailable = wifiFeatureAvailable,
+            nearbyWifiPermissionGranted = nearbyWifiPermissionGranted,
+            networkRequestsEnabled = networkRequestsEnabled,
+            cellRawInfoCount = cellRawInfoCount,
+            cellRawInfoTypes = cellRawInfoTypes,
+            cellCandidateRadios = cellCandidateRadios,
+            beaconDbCellCandidatesUsedCount = beaconDbCellCandidatesUsedCount,
+            beaconDbUnsupportedCellRadios = beaconDbUnsupportedCellRadios,
+            beaconDbWifiCandidatesUsedCount = beaconDbWifiCandidatesUsedCount,
+            wifiCachedScanCandidatesCount = wifiCachedScanCandidatesCount,
+            wifiFreshScanCandidatesCount = wifiFreshScanCandidatesCount,
+            wifiConnectedCandidateAvailable = wifiConnectedCandidateAvailable,
+            bssidSource = bssidSource,
+            bssidUnavailableReason = bssidUnavailableReason,
         )
     }
+
+    private fun wifi(
+        mac: String,
+        signalStrength: Int,
+    ) = WifiLookupCandidate(
+        macAddress = mac,
+        frequency = 2412,
+        signalStrength = signalStrength,
+    )
 }

@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.DebugStepTiming
 import com.notcvnt.rknhardering.checker.IndirectCheckPerformanceRegistry
+import com.notcvnt.rknhardering.checker.LocationSignalsDiagnosticsRegistry
 import com.notcvnt.rknhardering.checker.StunScopeTiming
 import com.notcvnt.rknhardering.checker.summarizeDominantDelay
 import com.notcvnt.rknhardering.model.ActiveVpnApp
@@ -64,6 +65,7 @@ object DebugDiagnosticsFormatter {
         appendCategory(builder, "rttTriangulation", result.rttTriangulation)
         appendIndirectPerformance(builder, result.indirectSigns)
         appendCategory(builder, "locationSignals", result.locationSignals)
+        appendLocationSignalsDiagnostics(builder, result.locationSignals)
         appendBypass(builder, result.bypassResult)
         appendCategory(builder, "nativeSigns", result.nativeSigns)
         appendNativeSignsRaw(builder, privacyMode)
@@ -412,6 +414,37 @@ object DebugDiagnosticsFormatter {
                 builder.appendLine("- ${formatStunScopeTiming(timing)}")
             }
         }
+    }
+
+    private fun appendLocationSignalsDiagnostics(
+        builder: StringBuilder,
+        category: CategoryResult,
+    ) {
+        val diagnostics = LocationSignalsDiagnosticsRegistry.find(category) ?: return
+        builder.appendLine()
+        builder.appendLine("[locationSignals.debug]")
+        builder.appendLine("fineLocationPermissionGranted: ${diagnostics.fineLocationPermissionGranted}")
+        builder.appendLine("nearbyWifiPermissionGranted: ${diagnostics.nearbyWifiPermissionGranted}")
+        builder.appendLine("locationServicesEnabled: ${diagnostics.locationServicesEnabled}")
+        builder.appendLine("telephonyRadioAccessAvailable: ${diagnostics.telephonyRadioAccessAvailable}")
+        builder.appendLine("wifiFeatureAvailable: ${diagnostics.wifiFeatureAvailable}")
+        builder.appendLine("networkRequestsEnabled: ${diagnostics.networkRequestsEnabled}")
+        builder.appendLine("cellRawInfoCount: ${diagnostics.cellRawInfoCount}")
+        builder.appendLine("cellRawInfoTypes: ${formatStringList(diagnostics.cellRawInfoTypes)}")
+        builder.appendLine("cellCandidateRadios: ${formatStringList(diagnostics.cellCandidateRadios)}")
+        builder.appendLine("beaconDbCellCandidatesUsedCount: ${diagnostics.beaconDbCellCandidatesUsedCount}")
+        builder.appendLine("beaconDbUnsupportedCellRadios: ${formatStringList(diagnostics.beaconDbUnsupportedCellRadios)}")
+        builder.appendLine("beaconDbWifiCandidatesUsedCount: ${diagnostics.beaconDbWifiCandidatesUsedCount}")
+        builder.appendLine("wifiAccessPointCandidatesCount: ${diagnostics.wifiAccessPointCandidatesCount}")
+        builder.appendLine("wifiCachedScanCandidatesCount: ${diagnostics.wifiCachedScanCandidatesCount}")
+        builder.appendLine("wifiFreshScanCandidatesCount: ${diagnostics.wifiFreshScanCandidatesCount?.toString() ?: "<timeout>"}")
+        builder.appendLine("wifiConnectedCandidateAvailable: ${diagnostics.wifiConnectedCandidateAvailable}")
+        builder.appendLine("bssidSource: ${diagnostics.bssidSource ?: "<none>"}")
+        builder.appendLine("bssidUnavailableReason: ${diagnostics.bssidUnavailableReason ?: "<none>"}")
+    }
+
+    private fun formatStringList(values: List<String>): String {
+        return values.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "<none>"
     }
 
     private fun appendIpComparison(

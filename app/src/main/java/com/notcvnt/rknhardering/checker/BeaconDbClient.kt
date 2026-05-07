@@ -14,9 +14,17 @@ internal data class CellLookupCandidate(
     val mcc: String,
     val mnc: String,
     val areaCode: Long,
-    val cellId: Long,
+    val cellId: Long? = null,
+    val newRadioCellId: Long? = null,
     val registered: Boolean,
     val signalStrength: Int? = null,
+)
+
+internal data class BeaconDbInputDiagnostics(
+    val supportedCellCount: Int,
+    val unsupportedCellRadios: List<String>,
+    val wifiUsedCount: Int,
+    val wifiCandidateCount: Int,
 )
 
 internal data class WifiLookupCandidate(
@@ -59,14 +67,14 @@ internal class BeaconDbClient(
         cells: List<CellLookupCandidate>,
         wifiAccessPoints: List<WifiLookupCandidate>,
     ): CellLookupResult = withContext(Dispatchers.IO) {
-        val supportedCells = cells.filter { it.radio in SUPPORTED_RADIOS }.take(MAX_CELL_TOWERS)
+        val supportedCells = cells.filter(::isSupportedCell).take(MAX_CELL_TOWERS)
         val wifiForLookup = wifiAccessPoints.takeIf { it.size >= MIN_WIFI_ACCESS_POINTS }.orEmpty()
         if (supportedCells.isEmpty() && wifiForLookup.isEmpty()) {
             return@withContext CellLookupResult(
                 countryCode = null,
                 latitude = null,
                 longitude = null,
-                summary = "BeaconDB: insufficient radio data",
+                summary = "BeaconDB: insufficient radio data (need >=2 Wi-Fi APs or >=1 supported cell tower)",
             )
         }
 
@@ -133,7 +141,7 @@ internal class BeaconDbClient(
         cells: List<CellLookupCandidate>,
         wifiAccessPoints: List<WifiLookupCandidate>,
     ): String {
-        val supportedCells = cells.filter { it.radio in SUPPORTED_RADIOS }.take(MAX_CELL_TOWERS)
+        val supportedCells = cells.filter(::isSupportedCell).take(MAX_CELL_TOWERS)
         val wifiForLookup = wifiAccessPoints.takeIf { it.size >= MIN_WIFI_ACCESS_POINTS }.orEmpty()
         val cellJson = supportedCells.joinToString(",") { candidate ->
             buildString {
@@ -173,6 +181,25 @@ internal class BeaconDbClient(
         }
     }
 
+    internal fun inputDiagnostics(
+        cells: List<CellLookupCandidate>,
+        wifiAccessPoints: List<WifiLookupCandidate>,
+    ): BeaconDbInputDiagnostics {
+        val supportedCells = cells.filter(::isSupportedCell).take(MAX_CELL_TOWERS)
+        val unsupportedRadios = cells
+            .filterNot(::isSupportedCell)
+            .map { it.radio.lowercase(Locale.US) }
+            .distinct()
+            .sorted()
+        val wifiForLookup = wifiAccessPoints.takeIf { it.size >= MIN_WIFI_ACCESS_POINTS }.orEmpty()
+        return BeaconDbInputDiagnostics(
+            supportedCellCount = supportedCells.size,
+            unsupportedCellRadios = unsupportedRadios,
+            wifiUsedCount = wifiForLookup.take(MAX_WIFI_ACCESS_POINTS).size,
+            wifiCandidateCount = wifiAccessPoints.size,
+        )
+    }
+
     internal fun describeFailure(response: HttpResult): String {
         return when {
             response.code == 404 -> "BeaconDB: no matching location"
@@ -202,6 +229,12 @@ internal class BeaconDbClient(
 
     private fun escapeJson(value: String): String {
         return value.replace("\\", "\\\\").replace("\"", "\\\"")
+    }
+
+    private fun isSupportedCell(candidate: CellLookupCandidate): Boolean {
+        val radio = candidate.radio.lowercase(Locale.US)
+        if (radio !in SUPPORTED_RADIOS) return false
+        return candidate.cellId != null
     }
 
     private companion object {

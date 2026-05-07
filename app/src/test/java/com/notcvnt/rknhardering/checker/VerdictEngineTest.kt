@@ -244,6 +244,34 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `R6 detected location signal alone promotes to needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(
+                evidence = listOf(evidence(EvidenceSource.LOCATION_SIGNALS, EvidenceConfidence.MEDIUM)),
+            ),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `R6 review only location signal does not promote verdict`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(needsReview = true),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+        assertEquals(Verdict.NOT_DETECTED, verdict)
+    }
+
+    @Test
     fun `R7 empty input yields not detected`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),

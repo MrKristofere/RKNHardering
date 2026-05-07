@@ -5,6 +5,20 @@ plugins {
 
 val nativeNdkVersion = "28.2.13676358"
 val nativeCmakeVersion = "3.22.1"
+val robolectricSdk33RuntimeDep by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+val robolectricSdk35RuntimeDep by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+val robolectricRuntimeDepsDir = layout.buildDirectory.dir("robolectric-runtime-deps")
+val prepareRobolectricRuntimeDeps by tasks.registering(Copy::class) {
+    from(robolectricSdk33RuntimeDep)
+    from(robolectricSdk35RuntimeDep)
+    into(robolectricRuntimeDepsDir)
+}
 
 android {
     namespace = "com.notcvnt.rknhardering"
@@ -71,8 +85,10 @@ android {
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
-    val testHomeDir = layout.projectDirectory.dir(".test-home").asFile
-    val tempDir = testHomeDir.resolve("tmp")
+    val testHomeDir = layout.buildDirectory.dir("test-home").get().asFile
+    val tempDir = layout.buildDirectory.dir("test-tmp").get().asFile
+
+    dependsOn(prepareRobolectricRuntimeDeps)
 
     doFirst {
         testHomeDir.mkdirs()
@@ -81,6 +97,9 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
 
     systemProperty("user.home", testHomeDir.absolutePath)
     systemProperty("java.io.tmpdir", tempDir.absolutePath)
+    systemProperty("robolectric.dependency.dir", robolectricRuntimeDepsDir.get().asFile.absolutePath)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.usePreinstrumentedJars", "false")
 }
 
 dependencies {
@@ -100,6 +119,8 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+    robolectricSdk33RuntimeDep("org.robolectric:android-all:13-robolectric-9030017")
+    robolectricSdk35RuntimeDep("org.robolectric:android-all:15-robolectric-13954326")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

@@ -5,6 +5,8 @@ import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.DebugStepTiming
 import com.notcvnt.rknhardering.checker.IndirectCheckPerformanceDiagnostics
 import com.notcvnt.rknhardering.checker.IndirectCheckPerformanceRegistry
+import com.notcvnt.rknhardering.checker.LocationSignalsDiagnostics
+import com.notcvnt.rknhardering.checker.LocationSignalsDiagnosticsRegistry
 import com.notcvnt.rknhardering.checker.StunScopeTiming
 import com.notcvnt.rknhardering.model.ActiveVpnApp
 import com.notcvnt.rknhardering.model.BypassResult
@@ -201,6 +203,75 @@ class DebugDiagnosticsFormatterTest {
         assertTrue(report.contains("target=rutracker.org"))
         assertTrue(report.contains("rawBody=ip=203.0.*.*\\nloc=FI"))
         assertFalse(report.contains("203.0.113.64"))
+    }
+
+    @Test
+    fun `formatter prints location diagnostics outside findings`() {
+        val emptyCategory = CategoryResult(name = "empty", detected = false, findings = emptyList())
+        val location = LocationSignalsDiagnosticsRegistry.attach(
+            CategoryResult(
+                name = "Location",
+                detected = false,
+                findings = listOf(Finding("Cell lookup candidates: 1")),
+            ),
+            LocationSignalsDiagnostics(
+                fineLocationPermissionGranted = true,
+                nearbyWifiPermissionGranted = true,
+                locationServicesEnabled = true,
+                telephonyRadioAccessAvailable = true,
+                wifiFeatureAvailable = true,
+                networkRequestsEnabled = true,
+                cellRawInfoCount = 2,
+                cellRawInfoTypes = listOf("nr"),
+                cellCandidateRadios = listOf("nr"),
+                beaconDbCellCandidatesUsedCount = 0,
+                beaconDbUnsupportedCellRadios = listOf("nr"),
+                beaconDbWifiCandidatesUsedCount = 0,
+                wifiAccessPointCandidatesCount = 1,
+                wifiCachedScanCandidatesCount = 1,
+                wifiFreshScanCandidatesCount = null,
+                wifiConnectedCandidateAvailable = false,
+                bssidSource = "single Wi-Fi scan candidate",
+                bssidUnavailableReason = "connected Wi-Fi info is redacted by Android",
+            ),
+        )
+        val result = CheckResult(
+            geoIp = emptyCategory,
+            ipComparison = IpComparisonResult(
+                detected = false,
+                summary = "",
+                ruGroup = IpCheckerGroupResult(title = "RU", detected = false, statusLabel = "", summary = "", responses = emptyList()),
+                nonRuGroup = IpCheckerGroupResult(title = "NON_RU", detected = false, statusLabel = "", summary = "", responses = emptyList()),
+            ),
+            directSigns = emptyCategory,
+            indirectSigns = emptyCategory,
+            locationSignals = location,
+            bypassResult = BypassResult(
+                proxyEndpoint = null,
+                directIp = null,
+                proxyIp = null,
+                vpnNetworkIp = null,
+                underlyingIp = null,
+                xrayApiScanResult = null,
+                proxyChecks = emptyList(),
+                findings = emptyList(),
+                detected = false,
+            ),
+            verdict = Verdict.NOT_DETECTED,
+        )
+
+        val report = DebugDiagnosticsFormatter.format(
+            result = result,
+            settings = CheckSettings(),
+            privacyMode = true,
+        )
+
+        assertTrue(report.contains("[locationSignals.debug]"))
+        assertTrue(report.contains("cellRawInfoCount: 2"))
+        assertTrue(report.contains("cellRawInfoTypes: nr"))
+        assertTrue(report.contains("beaconDbUnsupportedCellRadios: nr"))
+        assertTrue(report.contains("wifiFreshScanCandidatesCount: <timeout>"))
+        assertFalse(report.contains("- description=Cell raw info:"))
     }
 
     @Test

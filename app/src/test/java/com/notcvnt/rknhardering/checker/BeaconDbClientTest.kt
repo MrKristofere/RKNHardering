@@ -84,7 +84,10 @@ class BeaconDbClientTest {
         val result = client.lookup(emptyList(), listOf(wifi()))
 
         assertFalse(called)
-        assertEquals("BeaconDB: insufficient radio data", result.summary)
+        assertEquals(
+            "BeaconDB: insufficient radio data (need >=2 Wi-Fi APs or >=1 supported cell tower)",
+            result.summary,
+        )
     }
 
     @Test
@@ -105,11 +108,29 @@ class BeaconDbClientTest {
         val client = BeaconDbClient(countryResolver = { _, _ -> null })
 
         val body = client.buildRequestBody(
-            cells = listOf(cell(radio = "nr")),
+            cells = listOf(cell(radio = "cdma")),
             wifiAccessPoints = emptyList(),
         )
 
         assertTrue(body.contains("\"cellTowers\":[]"))
+    }
+
+    @Test
+    fun `nr radio is excluded from beacon db payload diagnostics`() {
+        val client = BeaconDbClient(countryResolver = { _, _ -> null })
+
+        val body = client.buildRequestBody(
+            cells = listOf(cell(radio = "nr", cellId = null, newRadioCellId = 1234567890)),
+            wifiAccessPoints = emptyList(),
+        )
+        val diagnostics = client.inputDiagnostics(
+            cells = listOf(cell(radio = "nr", cellId = null, newRadioCellId = 1234567890)),
+            wifiAccessPoints = emptyList(),
+        )
+
+        assertTrue(body.contains("\"cellTowers\":[]"))
+        assertEquals(0, diagnostics.supportedCellCount)
+        assertEquals(listOf("nr"), diagnostics.unsupportedCellRadios)
     }
 
     @Test
@@ -158,12 +179,17 @@ class BeaconDbClientTest {
         assertEquals(2, "\"macAddress\":".toRegex().findAll(capturedRequest).count())
     }
 
-    private fun cell(radio: String = "lte"): CellLookupCandidate = CellLookupCandidate(
+    private fun cell(
+        radio: String = "lte",
+        cellId: Long? = 67890,
+        newRadioCellId: Long? = null,
+    ): CellLookupCandidate = CellLookupCandidate(
         radio = radio,
         mcc = "250",
         mnc = "1",
         areaCode = 12345,
-        cellId = 67890,
+        cellId = cellId,
+        newRadioCellId = newRadioCellId,
         registered = true,
         signalStrength = -75,
     )

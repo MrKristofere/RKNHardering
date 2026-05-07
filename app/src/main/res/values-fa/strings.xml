@@ -84,6 +84,9 @@
     <string name="settings_dns_bootstrap_hint">8.8.8.8, 8.8.4.4</string>
     <string name="settings_privacy_mode">حالت حریم خصوصی</string>
     <string name="settings_privacy_mode_desc">IP به شکل 185.22.*.* نمایش داده می‌شود</string>
+    <string name="settings_icon_style">نماد برنامه</string>
+    <string name="settings_icon_style_classic">کلاسیک</string>
+    <string name="settings_icon_style_new">جدید</string>
     <string name="settings_theme">تم</string>
     <string name="settings_theme_light">روشن</string>
     <string name="settings_theme_dark">تیره</string>
@@ -497,6 +500,9 @@
     <string name="checker_bypass_open_proxy_review_suffix"> (نیازمند تأیید دور زدن)</string>
     <string name="checker_bypass_no_xray">Xray gRPC API: پیدا نشد</string>
     <string name="checker_bypass_xray_api">Xray gRPC API: %1$s</string>
+    <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
+    <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds در دسترس نیست؛ نشانی‌های outbound آشکار نشدند.</string>
+    <string name="checker_bypass_xray_stats_sample">شمارنده‌های StatsService: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;%1$d outbound دیگر</item>
         <item quantity="other">&#160;&#160;&#8230;%1$d outbound دیگر</item>
