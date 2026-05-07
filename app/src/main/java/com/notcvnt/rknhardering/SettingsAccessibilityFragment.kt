@@ -146,7 +146,8 @@ internal class SettingsAccessibilityFragment : Fragment(R.layout.fragment_settin
     }
 
     private fun applyLauncherIcon(root: View, mode: ColorVisionMode) {
-        val target = LauncherIconVariant.fromCvd(mode, redGreenSubVariantFromPrefs())
+        val iconStyleClassic = prefs.getString(SettingsPrefs.PREF_ICON_STYLE, "new") == "classic"
+        val target = LauncherIconVariant.resolve(iconStyleClassic, mode, redGreenSubVariantFromPrefs())
         val message = if (LauncherIconManager.apply(requireContext(), target)) {
             R.string.settings_color_vision_icon_changed_warning
         } else {

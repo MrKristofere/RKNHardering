@@ -80,6 +80,20 @@ class LauncherIconManagerTest {
     }
 
     @Test
+    fun `apply enables CLASSIC and disables all other variants`() {
+        assertTrue(LauncherIconManager.apply(context, LauncherIconVariant.CLASSIC))
+
+        LauncherIconVariant.entries.forEach { variant ->
+            val expected = if (variant == LauncherIconVariant.CLASSIC) {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            }
+            assertEquals(expected, componentState(variant))
+        }
+    }
+
+    @Test
     fun `apply returns false when package manager rejects alias toggle`() {
         LauncherIconManager.setComponentEnabledSettingForTests = { _, _, _ ->
             throw SecurityException("blocked")

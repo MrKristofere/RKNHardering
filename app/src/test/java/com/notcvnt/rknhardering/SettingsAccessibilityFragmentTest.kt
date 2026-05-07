@@ -113,6 +113,20 @@ class SettingsAccessibilityFragmentTest {
         assertEquals(LauncherIconVariant.MONOCHROME, LauncherIconManager.current(context))
     }
 
+    @Test
+    fun `changing CVD mode when classic icon style is set does not change launcher icon`() {
+        AppUiSettings.prefs(context).edit {
+            putString(SettingsPrefs.PREF_ICON_STYLE, "classic")
+        }
+        LauncherIconManager.apply(context, LauncherIconVariant.CLASSIC)
+
+        val scenario = accessibilityFragment()
+        scenario.root.findViewById<Chip>(R.id.chipColorVisionRedGreen).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(LauncherIconVariant.CLASSIC, LauncherIconManager.current(context))
+    }
+
     private fun accessibilityFragment(): AccessibilityScenario {
         val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
         activity.supportFragmentManager.beginTransaction()

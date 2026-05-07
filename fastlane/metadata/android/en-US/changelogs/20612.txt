@@ -1,1 +1,3 @@
-Launcher icon now follows the selected color-vision accessibility mode.
+Added SNITCH check (β): detects IP and DNS leak signals via a redirect chain.
+Redesigned app icon; icon now follows the selected color-vision accessibility mode.
+Added classic icon option in Appearance settings.

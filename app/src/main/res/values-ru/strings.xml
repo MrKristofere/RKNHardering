@@ -84,6 +84,9 @@
     <string name="settings_dns_bootstrap_hint">8.8.8.8, 8.8.4.4</string>
     <string name="settings_privacy_mode">Приватный режим</string>
     <string name="settings_privacy_mode_desc">IP отображается как 185.22.*.*</string>
+    <string name="settings_icon_style">Иконка приложения</string>
+    <string name="settings_icon_style_classic">Классическая</string>
+    <string name="settings_icon_style_new">Новая</string>
     <string name="settings_theme">Тема</string>
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Тёмная</string>
@@ -307,7 +310,7 @@
     <string name="narrative_value_call_transport_proxy_assisted_udp_stun">UDP STUN через proxy</string>
 
     <!-- VerdictNarrative: reason rows -->
-    <string name="narrative_reason_xray_api">На устройстве найден локальный Xray API, из которого читаются outbound-адреса.</string>
+    <string name="narrative_reason_xray_api">На устройстве найден локальный Xray API.</string>
     <string name="narrative_reason_split_tunnel">Прямой IP и IP через локальный proxy различаются.</string>
     <string name="narrative_reason_vpn_gateway_leak">При активном VPN приложение смогло выйти через non-VPN сеть.</string>
     <string name="narrative_reason_vpn_network_binding">Приложение смогло использовать объект VPN Network отдельно от обычной сети.</string>
@@ -480,6 +483,9 @@
     <string name="checker_bypass_open_proxy_review_suffix"> (требует подтверждения обхода)</string>
     <string name="checker_bypass_no_xray">Xray gRPC API: не обнаружен</string>
     <string name="checker_bypass_xray_api">Xray gRPC API: %1$s</string>
+    <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
+    <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds недоступен; outbound-адреса не раскрыты.</string>
+    <string name="checker_bypass_xray_stats_sample">Счётчики StatsService: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;ещё %1$d аутбаунд</item>
         <item quantity="few">&#160;&#160;&#8230;ещё %1$d аутбаунда</item>

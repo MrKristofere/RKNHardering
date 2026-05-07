@@ -5,6 +5,7 @@ internal enum class LauncherIconVariant(
     val prefValue: String,
 ) {
     ORIGINAL("com.notcvnt.rknhardering.LauncherOriginal", "original"),
+    CLASSIC("com.notcvnt.rknhardering.LauncherClassic", "classic"),
     PROTANOPIA("com.notcvnt.rknhardering.LauncherProtanopia", "protanopia"),
     DEUTERANOPIA("com.notcvnt.rknhardering.LauncherDeuteranopia", "deuteranopia"),
     TRITANOPIA("com.notcvnt.rknhardering.LauncherTritanopia", "tritanopia"),
@@ -22,6 +23,15 @@ internal enum class LauncherIconVariant(
                 ColorVisionMode.BLUE_YELLOW -> TRITANOPIA
                 ColorVisionMode.ACHROMATOPSIA -> MONOCHROME
             }
+        }
+
+        fun resolve(
+            iconStyleClassic: Boolean,
+            mode: ColorVisionMode,
+            redGreenSub: LauncherIconVariant?,
+        ): LauncherIconVariant {
+            if (iconStyleClassic) return CLASSIC
+            return fromCvd(mode, redGreenSub)
         }
     }
 }

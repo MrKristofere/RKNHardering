@@ -83,6 +83,9 @@
     <string name="settings_dns_bootstrap_hint">8.8.8.8, 8.8.4.4</string>
     <string name="settings_privacy_mode">Privacy mode</string>
     <string name="settings_privacy_mode_desc">IP is shown as 185.22.*.*</string>
+    <string name="settings_icon_style">App icon</string>
+    <string name="settings_icon_style_classic">Classic</string>
+    <string name="settings_icon_style_new">New</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
@@ -304,7 +307,7 @@
     <string name="narrative_value_call_transport_proxy_assisted_udp_stun">proxy-assisted UDP STUN</string>
 
     <!-- VerdictNarrative: reason rows -->
-    <string name="narrative_reason_xray_api">A local Xray API was found on the device and exposes outbound addresses.</string>
+    <string name="narrative_reason_xray_api">A local Xray API was found on the device.</string>
     <string name="narrative_reason_split_tunnel">The direct IP and the IP via the local proxy differ.</string>
     <string name="narrative_reason_vpn_gateway_leak">With VPN active, the app was able to access the non-VPN network.</string>
     <string name="narrative_reason_vpn_network_binding">The app was able to use the VPN Network object separately from the regular network.</string>
@@ -477,6 +480,9 @@
     <string name="checker_bypass_open_proxy_review_suffix"> (requires bypass confirmation)</string>
     <string name="checker_bypass_no_xray">Xray gRPC API: not found</string>
     <string name="checker_bypass_xray_api">Xray gRPC API: %1$s</string>
+    <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
+    <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds is unavailable; outbound addresses were not exposed.</string>
+    <string name="checker_bypass_xray_stats_sample">StatsService counters: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;%1$d more outbound</item>
         <item quantity="other">&#160;&#160;&#8230;%1$d more outbounds</item>

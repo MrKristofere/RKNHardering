@@ -36,4 +36,60 @@ class LauncherIconVariantTest {
             LauncherIconVariant.fromCvd(ColorVisionMode.ACHROMATOPSIA, LauncherIconVariant.PROTANOPIA),
         )
     }
+
+    @Test
+    fun `resolve returns CLASSIC when icon style is classic regardless of CVD`() {
+        assertEquals(
+            LauncherIconVariant.CLASSIC,
+            LauncherIconVariant.resolve(
+                iconStyleClassic = true,
+                mode = ColorVisionMode.OFF,
+                redGreenSub = null,
+            ),
+        )
+        assertEquals(
+            LauncherIconVariant.CLASSIC,
+            LauncherIconVariant.resolve(
+                iconStyleClassic = true,
+                mode = ColorVisionMode.RED_GREEN,
+                redGreenSub = LauncherIconVariant.DEUTERANOPIA,
+            ),
+        )
+        assertEquals(
+            LauncherIconVariant.CLASSIC,
+            LauncherIconVariant.resolve(
+                iconStyleClassic = true,
+                mode = ColorVisionMode.ACHROMATOPSIA,
+                redGreenSub = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `resolve delegates to fromCvd when icon style is new`() {
+        assertEquals(
+            LauncherIconVariant.ORIGINAL,
+            LauncherIconVariant.resolve(
+                iconStyleClassic = false,
+                mode = ColorVisionMode.OFF,
+                redGreenSub = null,
+            ),
+        )
+        assertEquals(
+            LauncherIconVariant.DEUTERANOPIA,
+            LauncherIconVariant.resolve(
+                iconStyleClassic = false,
+                mode = ColorVisionMode.RED_GREEN,
+                redGreenSub = null,
+            ),
+        )
+        assertEquals(
+            LauncherIconVariant.MONOCHROME,
+            LauncherIconVariant.resolve(
+                iconStyleClassic = false,
+                mode = ColorVisionMode.ACHROMATOPSIA,
+                redGreenSub = null,
+            ),
+        )
+    }
 }
