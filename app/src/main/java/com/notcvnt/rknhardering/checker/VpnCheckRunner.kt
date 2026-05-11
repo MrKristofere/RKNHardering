@@ -166,7 +166,9 @@ object VpnCheckRunner {
         )
         fun ipComparison(context: Context, error: Throwable): IpComparisonResult = IpComparisonResult(
             detected = false,
-            summary = error.message ?: "",
+            needsReview = true,
+            hasError = true,
+            summary = error.message ?: error::class.java.simpleName,
             ruGroup = IpCheckerGroupResult(
                 title = context.getString(R.string.checker_ip_comp_ru_checkers),
                 detected = false, statusLabel = "", summary = "", responses = emptyList(),
@@ -176,7 +178,13 @@ object VpnCheckRunner {
                 detected = false, statusLabel = "", summary = "", responses = emptyList(),
             ),
         )
-        fun cdn(error: Throwable): CdnPullingResult = CdnPullingResult.empty()
+        fun cdn(error: Throwable): CdnPullingResult = CdnPullingResult(
+            detected = false,
+            needsReview = true,
+            hasError = true,
+            summary = error.message ?: error::class.java.simpleName,
+            findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
+        )
         fun probe(error: Throwable): UnderlyingNetworkProber.ProbeResult =
             UnderlyingNetworkProber.ProbeResult(
                 vpnActive = false,

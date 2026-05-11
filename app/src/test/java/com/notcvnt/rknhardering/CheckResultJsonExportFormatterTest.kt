@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.notcvnt.rknhardering.model.Finding
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,6 +55,42 @@ class CheckResultJsonExportFormatterTest {
         assertTrue(outbound.getBoolean("publicKeyPresent"))
         assertFalse(outbound.has("uuid"))
         assertFalse(outbound.has("publicKey"))
+    }
+
+    @Test
+    fun `json export marks ip comparison and bypass errors`() {
+        val base = exportEmptyCheckResult()
+        val json = JSONObject(
+            CheckResultJsonExportFormatter.format(
+                context = context,
+                snapshot = createCompletedExportSnapshot(
+                    result = base.copy(
+                        ipComparison = base.ipComparison.copy(
+                            needsReview = true,
+                            hasError = true,
+                            summary = "ip comparison failed",
+                        ),
+                        bypassResult = base.bypassResult.copy(
+                            needsReview = true,
+                            findings = listOf(Finding("bypass failed", isError = true)),
+                        ),
+                    ),
+                    privacyMode = false,
+                    finishedAtMillis = 0L,
+                ),
+                appVersionName = "1.0",
+                buildType = "debug",
+            ),
+        )
+
+        val results = json.getJSONObject("results")
+        val ipComparison = results.getJSONObject("ipComparison")
+        val bypass = results.getJSONObject("bypass")
+
+        assertTrue(ipComparison.getBoolean("hasError"))
+        assertEquals("[ERROR]", ipComparison.getString("status"))
+        assertTrue(bypass.getBoolean("hasError"))
+        assertEquals("[ERROR]", bypass.getString("status"))
     }
 
     @Test

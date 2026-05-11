@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.UnparsedIp
 import org.junit.Assert.assertFalse
@@ -38,6 +39,37 @@ class CheckResultMarkdownExportFormatterTest {
         assertTrue(markdown.contains("## ${context.getString(R.string.main_card_icmp_spoofing)}"))
         assertTrue(markdown.contains("## ${context.getString(R.string.settings_split_tunnel)}"))
         assertTrue(markdown.contains("## Footer"))
+    }
+
+    @Test
+    fun `markdown export marks ip comparison and bypass errors`() {
+        val base = exportEmptyCheckResult()
+        val markdown = CheckResultMarkdownExportFormatter.format(
+            context = context,
+            snapshot = createCompletedExportSnapshot(
+                result = base.copy(
+                    ipComparison = base.ipComparison.copy(
+                        needsReview = true,
+                        hasError = true,
+                        summary = "ip comparison failed",
+                    ),
+                    bypassResult = base.bypassResult.copy(
+                        needsReview = true,
+                        findings = listOf(Finding("bypass failed", isError = true)),
+                    ),
+                ),
+                privacyMode = false,
+                finishedAtMillis = 0L,
+            ),
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertTrue(markdown.contains("| ${context.getString(R.string.main_card_ip_comparison)} | [ERROR] | ip comparison failed |"))
+        assertTrue(markdown.contains("| ${context.getString(R.string.settings_split_tunnel)} | [ERROR] | bypass failed |"))
+        assertTrue(markdown.contains("## ${context.getString(R.string.main_card_ip_comparison)}"))
+        assertTrue(markdown.contains("## ${context.getString(R.string.settings_split_tunnel)}"))
+        assertTrue(markdown.contains("- Status: [ERROR]"))
     }
 
     @Test

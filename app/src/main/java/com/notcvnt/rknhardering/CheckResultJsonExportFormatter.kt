@@ -134,6 +134,7 @@ internal object CheckResultJsonExportFormatter {
             put("detected", category.detected)
             put("needsReview", category.needsReview)
             put("hasError", category.hasError)
+            put("status", sectionStatusTag(category.detected, category.needsReview, category.hasError))
             put("findings", JSONArray().apply { category.findings.forEach { put(findingToJson(it, privacyMode)) } })
             put("evidence", JSONArray().apply { category.evidence.forEach { put(evidenceToJson(it, privacyMode)) } })
             put("matchedApps", JSONArray().apply { category.matchedApps.forEach { put(matchedAppToJson(it)) } })
@@ -206,7 +207,8 @@ internal object CheckResultJsonExportFormatter {
         return JSONObject().apply {
             put("detected", result.detected)
             put("needsReview", result.needsReview)
-            put("status", sectionStatusTag(result.detected, result.needsReview))
+            put("hasError", result.hasError)
+            put("status", sectionStatusTag(result.detected, result.needsReview, result.hasError))
             put("summary", maskExportValue(result.summary, privacyMode))
             put("ruGroup", ipCheckerGroupToJson(result.ruGroup, privacyMode))
             put("nonRuGroup", ipCheckerGroupToJson(result.nonRuGroup, privacyMode))
@@ -247,7 +249,8 @@ internal object CheckResultJsonExportFormatter {
         return JSONObject().apply {
             put("detected", bypass.detected)
             put("needsReview", bypass.needsReview)
-            put("status", sectionStatusTag(bypass.detected, bypass.needsReview))
+            put("hasError", bypass.hasError)
+            put("status", sectionStatusTag(bypass.detected, bypass.needsReview, bypass.hasError))
             put("proxyEndpoint", bypass.proxyEndpoint?.let { proxyEndpointToJson(it, privacyMode) })
             put("proxyOwner", bypass.proxyOwner?.let { proxyOwnerToJson(it) })
             put("proxyOwnerText", bypass.proxyOwner?.let { LocalProxyOwnerFormatter.format(context, it) })

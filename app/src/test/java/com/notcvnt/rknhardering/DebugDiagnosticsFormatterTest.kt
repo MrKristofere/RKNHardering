@@ -517,6 +517,46 @@ class DebugDiagnosticsFormatterTest {
     }
 
     @Test
+    fun `formatter marks section errors explicitly`() {
+        val base = exportEmptyCheckResult()
+        val result = base.copy(
+            ipComparison = base.ipComparison.copy(
+                needsReview = true,
+                hasError = true,
+                summary = "ip comparison failed",
+            ),
+            cdnPulling = CdnPullingResult(
+                detected = false,
+                needsReview = true,
+                hasError = true,
+                summary = "cdn failed",
+                findings = listOf(Finding("cdn failed", isError = true)),
+            ),
+            directSigns = CategoryResult(
+                name = "Direct",
+                detected = false,
+                needsReview = true,
+                findings = listOf(Finding("direct failed", isError = true)),
+            ),
+            bypassResult = base.bypassResult.copy(
+                needsReview = true,
+                findings = listOf(Finding("bypass failed", isError = true)),
+            ),
+        )
+
+        val report = DebugDiagnosticsFormatter.format(
+            result = result,
+            settings = CheckSettings(),
+            privacyMode = false,
+        )
+
+        assertTrue(report.contains("[ipComparison]\ndetected: false\nneedsReview: true\nhasError: true\nstatus: [ERROR]"))
+        assertTrue(report.contains("[cdnPulling]\ndetected: false\nneedsReview: true\nhasError: true\nstatus: [ERROR]"))
+        assertTrue(report.contains("[directSigns]\nname: Direct\ndetected: false\nneedsReview: true\nhasError: true\nstatus: [ERROR]"))
+        assertTrue(report.contains("[bypass]\ndetected: false\nneedsReview: true\nhasError: true\nstatus: [ERROR]"))
+    }
+
+    @Test
     fun `formatter prints indirect performance diagnostics`() {
         val indirect = CategoryResult(
             name = "Indirect",

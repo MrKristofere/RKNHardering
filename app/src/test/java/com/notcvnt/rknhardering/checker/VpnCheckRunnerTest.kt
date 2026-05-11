@@ -282,6 +282,7 @@ class VpnCheckRunnerTest {
         )
 
         assertTrue(result.directSigns.needsReview)
+        assertTrue(result.directSigns.hasError)
         assertEquals(Verdict.NEEDS_REVIEW, result.verdict)
     }
 
@@ -309,7 +310,42 @@ class VpnCheckRunnerTest {
         )
 
         assertTrue(result.indirectSigns.needsReview)
+        assertTrue(result.indirectSigns.hasError)
         assertEquals(Verdict.NEEDS_REVIEW, result.verdict)
+    }
+
+    @Test
+    fun `run keeps category fallback errors visible`() = runBlocking {
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> category("geo") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _ -> throw java.io.IOException("icmp failed") },
+            rttTriangulationCheck = { _, _, _ -> throw java.io.IOException("rtt failed") },
+            directCheck = { _, _ -> throw java.io.IOException("direct failed") },
+            indirectCheck = { _, _, _, _ -> throw java.io.IOException("indirect failed") },
+            locationCheck = { _, _, _ -> throw java.io.IOException("location failed") },
+            nativeCheck = { _ -> throw java.io.IOException("native failed") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val result = VpnCheckRunner.run(
+            context = context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = true,
+                rttTriangulationEnabled = true,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertTrue(result.icmpSpoofing.hasError)
+        assertTrue(result.rttTriangulation.hasError)
+        assertTrue(result.directSigns.hasError)
+        assertTrue(result.indirectSigns.hasError)
+        assertTrue(result.locationSignals.hasError)
+        assertTrue(result.nativeSigns.hasError)
     }
 
     @Test
@@ -587,6 +623,67 @@ class VpnCheckRunnerTest {
         } finally {
             VpnCheckRunner.dependenciesOverride = null
         }
+    }
+
+    @Test
+    fun `run marks ip comparison fallback as error`() = runBlocking {
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> category("geo") },
+            ipComparisonCheck = { _, _ -> throw java.io.IOException("ip comparison failed") },
+            icmpSpoofingCheck = { _, _ -> category("icmp") },
+            directCheck = { _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val result = VpnCheckRunner.run(
+            context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = true,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertTrue(result.ipComparison.hasError)
+        assertTrue(result.ipComparison.needsReview)
+        assertEquals("ip comparison failed", result.ipComparison.summary)
+    }
+
+    @Test
+    fun `run marks cdn pulling fallback as error`() = runBlocking {
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> category("geo") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            cdnPullingCheck = { _, _, _ -> throw java.io.IOException("cdn failed") },
+            icmpSpoofingCheck = { _, _ -> category("icmp") },
+            directCheck = { _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val result = VpnCheckRunner.run(
+            context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = true,
+                cdnPullingEnabled = true,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertTrue(result.cdnPulling.hasError)
+        assertTrue(result.cdnPulling.needsReview)
+        assertTrue(result.cdnPulling.findings.any { it.isError })
+        assertEquals("cdn failed", result.cdnPulling.summary)
     }
 
     @Test

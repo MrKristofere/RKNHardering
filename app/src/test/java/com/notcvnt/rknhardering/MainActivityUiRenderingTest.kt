@@ -10,13 +10,20 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.card.MaterialCardView
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
+import com.notcvnt.rknhardering.model.CallTransportProbeKind
+import com.notcvnt.rknhardering.model.CallTransportService
+import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CdnPullingResponse
+import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
+import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpFamily
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.ObservedIp
@@ -103,6 +110,7 @@ class MainActivityUiRenderingTest {
         val category = CategoryResult(
             name = "direct",
             detected = false,
+            needsReview = true,
             findings = listOf(Finding("Socket timeout to 203.0.113.64", isError = true)),
         )
         val card = activity.findViewById<MaterialCardView>(R.id.cardIndirect)
@@ -123,6 +131,103 @@ class MainActivityUiRenderingTest {
 
         assertEquals(activity.getString(R.string.main_card_status_error), status.text.toString())
         assertFalse(collectText(findings).contains("Socket timeout to 203.0.113.64"))
+    }
+
+    @Test
+    fun `category tile uses error before review`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val category = CategoryResult(
+            name = "direct",
+            detected = false,
+            needsReview = true,
+            findings = listOf(Finding("Corrupt Parcel", isError = true)),
+        )
+
+        invokePrivate<Unit>(activity, "updateTileFromCategory", "dir", category)
+
+        val tiles = getPrivateField<Map<String, Any>>(activity, "tiles")
+        val directTile = tiles.getValue("dir")
+        val hint = getPrivateField<TextView>(directTile, "hint")
+        val header = getPrivateField<View>(directTile, "header")
+
+        assertEquals(activity.getString(R.string.tile_hint_error), hint.text.toString())
+        assertTrueContains(header.contentDescription.toString(), activity.getString(R.string.main_card_status_error))
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.bodyDirect).visibility)
+    }
+
+    @Test
+    fun `ip comparison error status reaches card and tile`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val result = IpComparisonResult(
+            detected = false,
+            needsReview = true,
+            hasError = true,
+            summary = "ip comparison failed",
+            ruGroup = emptyIpCheckerGroup("RU"),
+            nonRuGroup = emptyIpCheckerGroup("NON_RU"),
+        )
+
+        invokePrivate<Unit>(activity, "displayIpComparison", result, false)
+        invokePrivate<Unit>(activity, "updateTileFromIpComparison", result)
+
+        assertEquals(activity.getString(R.string.main_card_status_error), activity.findViewById<TextView>(R.id.statusIpComparison).text.toString())
+        assertEquals(activity.getString(R.string.tile_hint_error), tileHint(activity, "ipc"))
+    }
+
+    @Test
+    fun `cdn pulling error status reaches card and tile`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val result = CdnPullingResult(
+            detected = false,
+            needsReview = true,
+            hasError = true,
+            summary = "cdn failed",
+            findings = listOf(Finding("cdn failed", isError = true)),
+        )
+
+        invokePrivate<Unit>(activity, "displayCdnPulling", result, false)
+        invokePrivate<Unit>(activity, "updateTileFromCdn", result)
+
+        assertEquals(activity.getString(R.string.main_card_status_error), activity.findViewById<TextView>(R.id.statusCdnPulling).text.toString())
+        assertEquals(activity.getString(R.string.tile_hint_error), tileHint(activity, "cdn"))
+    }
+
+    @Test
+    fun `bypass error finding reaches card and tile`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val result = BypassResult(
+            proxyEndpoint = null,
+            directIp = null,
+            proxyIp = null,
+            xrayApiScanResult = null,
+            findings = listOf(Finding("bypass failed", isError = true)),
+            detected = false,
+            needsReview = true,
+        )
+
+        invokePrivate<Unit>(activity, "displayBypass", result, false)
+        invokePrivate<Unit>(activity, "updateTileFromBypass", result)
+
+        assertEquals(activity.getString(R.string.main_card_status_error), activity.findViewById<TextView>(R.id.statusBypass).text.toString())
+        assertEquals(activity.getString(R.string.tile_hint_error), tileHint(activity, "byp"))
+    }
+
+    @Test
+    fun `call transport error status reaches card and tile`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val leak = CallTransportLeakResult(
+            service = CallTransportService.TELEGRAM,
+            probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
+            networkPath = CallTransportNetworkPath.ACTIVE,
+            status = CallTransportStatus.ERROR,
+            summary = "stun failed",
+        )
+
+        invokePrivate<Unit>(activity, "displayCallTransport", listOf(leak), emptyList<Any>(), false)
+        invokePrivate<Unit>(activity, "updateTileFromCallTransport", listOf(leak), emptyList<Any>())
+
+        assertEquals(activity.getString(R.string.main_card_status_error), activity.findViewById<TextView>(R.id.statusCallTransport).text.toString())
+        assertEquals(activity.getString(R.string.tile_hint_error), tileHint(activity, "stn"))
     }
 
     @Test
@@ -388,6 +493,22 @@ class MainActivityUiRenderingTest {
 
     private fun assertTrueContains(text: String, expected: String) {
         assertFalse("Expected text to contain <$expected>, got <$text>", !text.contains(expected))
+    }
+
+    private fun tileHint(activity: MainActivity, id: String): String {
+        val tiles = getPrivateField<Map<String, Any>>(activity, "tiles")
+        val tile = tiles.getValue(id)
+        return getPrivateField<TextView>(tile, "hint").text.toString()
+    }
+
+    private fun emptyIpCheckerGroup(title: String): IpCheckerGroupResult {
+        return IpCheckerGroupResult(
+            title = title,
+            detected = false,
+            statusLabel = "",
+            summary = "",
+            responses = emptyList(),
+        )
     }
 
     @Suppress("UNCHECKED_CAST")

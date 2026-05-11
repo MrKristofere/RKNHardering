@@ -2038,7 +2038,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun displayIpComparison(result: IpComparisonResult, privacyMode: Boolean = false) {
         cardIpComparison.visibility = View.VISIBLE
-        bindCardStatus(result.detected, result.needsReview, iconIpComparison, statusIpComparison)
+        bindCardStatus(result.detected, result.needsReview, iconIpComparison, statusIpComparison, hasError = result.hasError)
         textIpComparisonSummary.text = if (privacyMode) maskIpsInText(result.summary) else result.summary
 
         ipComparisonGroups.removeAllViews()
@@ -2046,14 +2046,14 @@ class MainActivity : AppCompatActivity() {
         ipComparisonGroups.addView(
             createIpCheckerGroupView(
                 group = result.ruGroup,
-                expanded = result.detected || result.needsReview || result.ruGroup.needsReview,
+                expanded = result.detected || result.needsReview || result.hasError || result.ruGroup.needsReview,
                 privacyMode = privacyMode,
             ),
         )
         ipComparisonGroups.addView(
             createIpCheckerGroupView(
                 group = result.nonRuGroup,
-                expanded = result.detected || result.needsReview || result.nonRuGroup.detected,
+                expanded = result.detected || result.needsReview || result.hasError || result.nonRuGroup.detected,
                 privacyMode = privacyMode,
             ),
         )
@@ -2560,7 +2560,7 @@ class MainActivity : AppCompatActivity() {
         cardBypass.visibility = View.VISIBLE
         resetBypassProgress()
 
-        bindCardStatus(bypass.detected, bypass.needsReview, iconBypass, statusBypass)
+        bindCardStatus(bypass.detected, bypass.needsReview, iconBypass, statusBypass, hasError = bypass.hasError)
 
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.VISIBLE
@@ -2588,7 +2588,7 @@ class MainActivity : AppCompatActivity() {
             needsReview = hasNeedsReview,
             icon = iconCallTransport,
             status = statusCallTransport,
-            hasError = hasError && !hasNeedsReview,
+            hasError = hasError,
         )
 
         val respondedCount = stunGroups.sumOf { it.respondedCount }
@@ -2960,8 +2960,8 @@ class MainActivity : AppCompatActivity() {
         hasError: Boolean = false,
     ): StatusSemantic {
         return when {
-            detected -> StatusSemantic.DETECTED
             hasError -> StatusSemantic.ERROR
+            detected -> StatusSemantic.DETECTED
             needsReview -> StatusSemantic.REVIEW
             else -> StatusSemantic.CLEAN
         }
@@ -3175,6 +3175,7 @@ class MainActivity : AppCompatActivity() {
         private const val TILE_STATUS_CLEAN = 1
         private const val TILE_STATUS_REVIEW = 2
         private const val TILE_STATUS_DETECTED = 3
+        private const val TILE_STATUS_ERROR = 4
     }
 
     private fun onTileClicked(id: String) {
@@ -3256,7 +3257,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (
-            (status == TILE_STATUS_REVIEW || status == TILE_STATUS_DETECTED) &&
+            (status == TILE_STATUS_REVIEW || status == TILE_STATUS_DETECTED || status == TILE_STATUS_ERROR) &&
             previousStatus != status
         ) {
             expandCategory(id)
@@ -3268,6 +3269,7 @@ class MainActivity : AppCompatActivity() {
             TILE_STATUS_CLEAN -> StatusSemantic.CLEAN
             TILE_STATUS_REVIEW -> StatusSemantic.REVIEW
             TILE_STATUS_DETECTED -> StatusSemantic.DETECTED
+            TILE_STATUS_ERROR -> StatusSemantic.ERROR
             else -> StatusSemantic.NEUTRAL
         }
     }
@@ -3283,8 +3285,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun statusFromCategory(detected: Boolean, needsReview: Boolean, hasError: Boolean): Int {
         return when {
+            hasError -> TILE_STATUS_ERROR
             detected -> TILE_STATUS_DETECTED
-            needsReview || hasError -> TILE_STATUS_REVIEW
+            needsReview -> TILE_STATUS_REVIEW
             else -> TILE_STATUS_CLEAN
         }
     }
@@ -3296,11 +3299,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTileFromIpComparison(result: IpComparisonResult) {
-        val status = statusFromCategory(result.detected, result.needsReview, hasError = false)
+        val status = statusFromCategory(result.detected, result.needsReview, result.hasError)
         val ru = result.ruGroup.responses.size
         val nonRu = result.nonRuGroup.responses.size
         val total = ru + nonRu
         val hint = when {
+            result.hasError -> getString(R.string.tile_hint_error)
             result.detected -> getString(R.string.tile_hint_review)
             result.needsReview -> getString(R.string.tile_hint_review)
             total > 0 -> getString(R.string.tile_hint_clean_count, total)
@@ -3313,9 +3317,9 @@ class MainActivity : AppCompatActivity() {
         val status = statusFromCategory(result.detected, result.needsReview, result.hasError)
         val total = result.responses.size
         val hint = when {
+            result.hasError -> getString(R.string.tile_hint_error)
             result.detected -> getString(R.string.tile_hint_review)
             result.needsReview -> getString(R.string.tile_hint_review)
-            result.hasError -> getString(R.string.tile_hint_error)
             total > 0 -> getString(R.string.tile_hint_clean_count, total)
             else -> null
         }
@@ -3323,8 +3327,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTileFromBypass(result: BypassResult) {
-        val status = statusFromCategory(result.detected, result.needsReview, hasError = false)
+        val status = statusFromCategory(result.detected, result.needsReview, result.hasError)
         val hint = when {
+            result.hasError -> getString(R.string.tile_hint_error)
             result.detected -> getString(R.string.tile_hint_review)
             result.needsReview -> getString(R.string.tile_hint_review)
             else -> getString(R.string.tile_hint_clean)
@@ -3365,14 +3370,15 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val status = when {
+            hasError -> TILE_STATUS_ERROR
             hasNeedsReview -> TILE_STATUS_REVIEW
-            hasError -> TILE_STATUS_REVIEW
             else -> TILE_STATUS_CLEAN
         }
-        val hint = if (totalCount > 0)
-            getString(R.string.main_card_call_transport_stun_responded, respondedCount, totalCount)
-        else
-            getString(R.string.tile_hint_clean_count, leaks.size)
+        val hint = when {
+            hasError -> getString(R.string.tile_hint_error)
+            totalCount > 0 -> getString(R.string.main_card_call_transport_stun_responded, respondedCount, totalCount)
+            else -> getString(R.string.tile_hint_clean_count, leaks.size)
+        }
         setTileStatus(CATEGORY_STN, status, hint)
     }
 
@@ -3472,10 +3478,10 @@ class MainActivity : AppCompatActivity() {
         val detected = nonInfo.count { it.detected }
         val total = nonInfo.size
         return when {
+            category.hasError -> getString(R.string.tile_hint_error)
             category.detected && total > 0 -> getString(R.string.tile_hint_detected_count, detected, total)
             category.detected -> getString(R.string.tile_hint_review)
             category.needsReview -> getString(R.string.tile_hint_review)
-            category.hasError -> getString(R.string.tile_hint_error)
             total > 0 -> getString(R.string.tile_hint_clean_count, total)
             else -> getString(R.string.tile_hint_clean)
         }

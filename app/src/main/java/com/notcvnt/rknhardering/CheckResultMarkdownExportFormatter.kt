@@ -129,7 +129,7 @@ internal object CheckResultMarkdownExportFormatter {
         appendSectionSummaryRow(
             builder,
             title = context.getString(R.string.main_card_ip_comparison),
-            status = sectionStatusTag(result.ipComparison.detected, result.ipComparison.needsReview),
+            status = sectionStatusTag(result.ipComparison.detected, result.ipComparison.needsReview, result.ipComparison.hasError),
             summary = buildSummary(result.ipComparison.summary, snapshot.privacyMode),
         )
         appendSectionSummaryRow(
@@ -177,7 +177,7 @@ internal object CheckResultMarkdownExportFormatter {
         appendSectionSummaryRow(
             builder,
             title = context.getString(R.string.settings_split_tunnel),
-            status = sectionStatusTag(result.bypassResult.detected, result.bypassResult.needsReview),
+            status = sectionStatusTag(result.bypassResult.detected, result.bypassResult.needsReview, result.bypassResult.hasError),
             summary = buildBypassSummary(result.bypassResult, snapshot.privacyMode),
         )
     }
@@ -244,7 +244,7 @@ internal object CheckResultMarkdownExportFormatter {
         privacyMode: Boolean,
     ) {
         builder.appendLine("## ${context.getString(R.string.main_card_ip_comparison)}")
-        builder.appendLine("- Status: ${sectionStatusTag(result.detected, result.needsReview)}")
+        builder.appendLine("- Status: ${sectionStatusTag(result.detected, result.needsReview, result.hasError)}")
         builder.appendLine("- Summary: ${buildSummary(result.summary, privacyMode)}")
         builder.appendLine()
         appendIpCheckerGroupSection(builder, "RU", result.ruGroup, privacyMode)
@@ -338,7 +338,7 @@ internal object CheckResultMarkdownExportFormatter {
         privacyMode: Boolean,
     ) {
         builder.appendLine("## ${context.getString(R.string.settings_split_tunnel)}")
-        builder.appendLine("- Status: ${sectionStatusTag(bypass.detected, bypass.needsReview)}")
+        builder.appendLine("- Status: ${sectionStatusTag(bypass.detected, bypass.needsReview, bypass.hasError)}")
         builder.appendLine("- Local proxy: ${bypass.proxyEndpoint?.let { formatProxyEndpoint(it, privacyMode) } ?: "<none>"}")
         builder.appendLine("- Owner app: ${bypass.proxyOwner?.let { LocalProxyOwnerFormatter.format(context, it) } ?: "<none>"}")
         builder.appendLine("- Direct IP: ${maskExportIp(bypass.directIp, privacyMode) ?: "<none>"}")

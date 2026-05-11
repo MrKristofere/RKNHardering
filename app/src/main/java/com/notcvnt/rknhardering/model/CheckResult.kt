@@ -285,7 +285,10 @@ data class BypassResult(
     val detected: Boolean,
     val needsReview: Boolean = false,
     val evidence: List<EvidenceItem> = emptyList(),
-)
+) {
+    val hasError: Boolean
+        get() = findings.any { it.isError }
+}
 
 enum class IpCheckerScope {
     RU,
@@ -317,6 +320,7 @@ data class IpCheckerGroupResult(
 data class IpComparisonResult(
     val detected: Boolean,
     val needsReview: Boolean = false,
+    val hasError: Boolean = false,
     val summary: String,
     val ruGroup: IpCheckerGroupResult,
     val nonRuGroup: IpCheckerGroupResult,
