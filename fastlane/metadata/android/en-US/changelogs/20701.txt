@@ -1,8 +1,4 @@
-Fixed false-positive verdict for foreign SIM roaming in Russia (issue #63): home-routed roaming is now recognised by MCC and the home operator's ASN.
-Added an explanatory banner to the verdict card when home-routed roaming is detected.
-Fixed roaming status heuristic: "Roaming: yes" is now shown when SIM MCC mismatches network MCC, even if telephony reported "no".
-Fixed SIM country label: foreign SIMs on a Russian visited network no longer show as RU.
-CDN pulling no longer flags "needs review" when all targets returned the same IP.
-Local SOCKS5 endpoints requiring auth with no resolved owner no longer inflate the verdict.
-JSON export now includes roaming diagnostics and richer GeoIP facts (ASN code, ISP, organisation).
-More information in data export.
+Fixed error handling: failed checks show as errors and no longer trigger false "Needs review" verdicts (#66).
+Fixed false positives for foreign SIM home-routed roaming in Russia, including CDN/ICMP verdicts and final UI refresh (#63).
+Improved multi-SIM roaming/SIM-country detection and added the roaming note to the redesigned verdict card.
+Fixed SOCKS/auth proxy edge cases; Markdown/JSON exports include statuses, roaming/GeoIP, TUN/STUN, IP channels, proxy and Xray diagnostics.
