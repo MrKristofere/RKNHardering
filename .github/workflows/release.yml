@@ -74,15 +74,15 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build signed release APK
+      - name: Build debug APK
         run: |
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug \
             -PappVersionName=${{ steps.android_version.outputs.name }}
 
       - name: Rename APK
         run: |
           VERSION=${{ steps.version.outputs.tag }}
-          mv app/build/outputs/apk/debug/app-release.apk \
+          mv app/build/outputs/apk/debug/app-debug.apk \
              app/build/outputs/apk/debug/RKNHardering-${VERSION}.apk
 
       - name: Generate changelog
