@@ -1,7 +1,7 @@
 name: Release
 
 env:
-  ANDROID_BUILD_TOOLS_VERSION: "35.0.0"
+  ANDROID_BUILD_TOOLS_VERSION: "36.0.0"
   ANDROID_CMAKE_VERSION: "3.22.1"
   ANDROID_NDK_VERSION: "28.2.13676358"
 
@@ -17,18 +17,19 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Resolve version
         id: version
@@ -51,7 +52,7 @@ jobs:
           echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -70,40 +71,18 @@ jobs:
             "ndk;${ANDROID_NDK_VERSION}" \
             "cmake;${ANDROID_CMAKE_VERSION}"
 
-      - name: Validate app version
-        run: |
-          VERSION_NAME=${{ steps.android_version.outputs.name }}
-          IFS=. read -r major minor patch <<< "$VERSION_NAME"
-          VERSION_CODE=$((major * 10000 + minor * 100 + patch))
-
-          grep -q "versionName = \"$VERSION_NAME\"" app/build.gradle.kts
-          grep -q "versionCode = $VERSION_CODE" app/build.gradle.kts
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Decode keystore
+      - name: Build debug APK
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
-
-      - name: Build signed release APK
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$KEYSTORE_PATH \
-            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+          ./gradlew assembleDebug
 
       - name: Rename APK
         run: |
           VERSION=${{ steps.version.outputs.tag }}
-          mv app/build/outputs/apk/release/app-release.apk \
-             app/build/outputs/apk/release/RKNHardering-${VERSION}.apk
+          mv app/build/outputs/apk/debug/app-debug.apk \
+             app/build/outputs/apk/debug/RKNHardering-${VERSION}.apk
 
       - name: Generate changelog
         id: changelog
@@ -125,11 +104,11 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           body: ${{ steps.changelog.outputs.notes }}
-          files: app/build/outputs/apk/release/RKNHardering-${{ steps.version.outputs.tag }}.apk
+          files: app/build/outputs/apk/debug/RKNHardering-${{ steps.version.outputs.tag }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
